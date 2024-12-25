@@ -39,11 +39,11 @@ class DiscountService
         sort($prices); // Sort prices in ascending order
 
 
-        // Special case for 4-7 items and cheapest item is less than MAX_PRICE_FOR_CHEAPEST
-        if ($total_items >= self::MIN_ITEMS_FOR_DISCOUNT && $total_items < 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
+        // Special case for 5-7 items and cheapest item is less than MAX_PRICE_FOR_CHEAPEST
+        if ($total_items >= 5 && $total_items < 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
             // Check if cheapest item is less than MAX_PRICE_FOR_CHEAPEST
             if ($prices[0] >= self::MAX_PRICE_FOR_CHEAPEST) {
-                return $prices[0];
+            return $prices[0];
             }
             // Return second cheapest item's price as discount
             return isset($prices[1]) ? $prices[1] : 0;
