@@ -1,73 +1,206 @@
 <?php
-namespace BXG1F\Services;
+namespace B4G1F\Services;
 
-class DiscountService {
-    // Constant defining minimum items needed for discount to apply
-    const MIN_ITEMS_FOR_DISCOUNT = 3;
+class DiscountService
+{
+    const MIN_ITEMS_FOR_DISCOUNT = 4;
 
     /**
      * Calculates the total discount to apply based on cart contents
-     * Works with both Classic Cart/Checkout and Block Cart/Checkout
-     *
-     * @param WC_Cart|WC_Store_API_Cart|null $cart WooCommerce cart object (Classic or Block Cart)
+     * 
+     * @param mixed $cart WooCommerce cart object
      * @return float Total discount amount
      */
-    public function calculate_discount($cart = null): float {
-        if (!$cart) {
-            return 0.0;
+    public function calculate_discount($cart)
+    {
+        // Return 0 if cart is null
+        if ($cart === null) {
+            return 0;
         }
 
-        // Handle both Classic Cart and Block Cart with null coalescing
-        $total_items = method_exists($cart, 'get_cart_contents_count')
-        ? ($cart->get_cart_contents_count() ?? 0)
-        : 0;
+        // Verify we have a valid cart object
+        if (!$this->is_valid_cart($cart)) {
+            return 0;
+        }
 
+        $total_items = $this->count_eligible_items($cart);
+        
         // Early return if not enough items
         if ($total_items < self::MIN_ITEMS_FOR_DISCOUNT) {
-            return 0.0;
+            return 0;
         }
 
         $prices = $this->get_item_prices($cart);
         if (empty($prices)) {
-            return 0.0;
+            return 0;
         }
 
-        // Sort prices ascending to get cheapest items first
         sort($prices);
-
-        // Calculate how many complete groups of 4 items exist
         $groups = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
-        $total_discount = 0.0;
+        $total_discount = 0;
 
-        // Add price of cheapest item for each complete group
-        // Ensure we don't exceed array bounds
-        for ($i = 0; $i < $groups && $i < count($prices); $i++) {
-            $total_discount += (float)($prices[$i] ?? 0.0);
+        for ($i = 0; $i < $groups; $i++) {
+            $total_discount += $prices[$i];
         }
 
         return $total_discount;
     }
 
     /**
-     * Extracts individual item prices from cart
-     * Compatible with both Classic Cart and Block Cart
-     *
-     * @param WC_Cart|WC_Store_API_Cart|null $cart WooCommerce cart object
-     * @return array Array of individual item prices
+     * Validates if the provided cart object is usable
+     * 
+     * @param mixed $cart
+     * @return bool
      */
-    private function get_item_prices($cart = null): array {
-        if (!$cart) {
-            return [];
+    private function is_valid_cart($cart)
+    {
+        if (!is_object($cart)) {
+            return false;
         }
 
-        $prices = [];
+        // Check for WC_Cart
+        if (method_exists($cart, 'get_cart')) {
+            return true;
+        }
 
-        // Handle both Classic Cart and Block Cart get_cart methods
-        try {
-            $cart_items = method_exists($cart, 'get_cart')
-            ? ($cart->get_cart() ?? [])
-            : ($cart->get_items() ?? []);
-        } catch (\Exception $e) {
+        // Check for Store API Cart
+        if (method_exists($cart, 'get_items')) {
+            // Additional verification to ensure it's not a Customer object
+            return method_exists($cart, 'get_cart_items') || method_exists($cart, 'get_totals');
+        }
+
+        return false;
+    }
+
+    /**
+     * Counts eligible items in cart, properly handling product bundles
+     * 
+     * @param mixed $cart
+     * @return int
+     */
+    private function count_eligible_items($cart)
+    {
+        $count = 0;
+        $cart_items = $this->get_cart_items($cart);
+
+        if (!is_array($cart_items)) {
+            return 0;
+        }
+
+        foreach ($cart_items as $cart_item) {
+            if (!$cart_item) {
+                continue;
+            }
+
+            // Skip bundled items to prevent double counting
+            if (isset($cart_item['bundled_by'])) {
+                continue;
+            }
+
+            // For product bundles
+            if (isset($cart_item['data']) && 
+                is_object($cart_item['data']) && 
+                method_exists($cart_item['data'], 'is_type') && 
+                $cart_item['data']->is_type('bundle')) {
+                $count += $this->get_item_quantity($cart_item);
+                continue;
+            }
+
+            // Regular products
+            $count += $this->get_item_quantity($cart_item);
+        }
+
+        return $count;
+    }
+
+    /**
+     * Safely gets cart items regardless of cart type
+     * 
+     * @param mixed $cart
+     * @return array|null
+     */
+    private function get_cart_items($cart)
+    {
+        if (!is_object($cart)) {
+            return null;
+        }
+
+        if (method_exists($cart, 'get_cart')) {
+            return $cart->get_cart();
+        }
+
+        if (method_exists($cart, 'get_items') && $this->is_valid_cart($cart)) {
+            return $cart->get_items();
+        }
+
+        return null;
+    }
+
+    /**
+     * Safely gets item quantity regardless of item type
+     * 
+     * @param mixed $cart_item
+     * @return int
+     */
+    private function get_item_quantity($cart_item)
+    {
+        if (!$cart_item) {
+            return 0;
+        }
+
+        if (isset($cart_item['quantity'])) {
+            return (int)$cart_item['quantity'];
+        }
+
+        if (is_object($cart_item) && method_exists($cart_item, 'get_quantity')) {
+            return (int)$cart_item->get_quantity();
+        }
+
+        return 0;
+    }
+
+    /**
+     * Safely gets item price regardless of item type
+     * 
+     * @param mixed $cart_item
+     * @return float
+     */
+    private function get_item_price($cart_item)
+    {
+        if (!$cart_item) {
+            return 0;
+        }
+
+        // Classic cart item
+        if (isset($cart_item['data']) && 
+            is_object($cart_item['data']) && 
+            method_exists($cart_item['data'], 'get_price')) {
+            return floatval($cart_item['data']->get_price());
+        }
+
+        // Store API cart item
+        if (is_object($cart_item) && method_exists($cart_item, 'get_product')) {
+            $product = $cart_item->get_product();
+            if ($product && is_object($product) && method_exists($product, 'get_price')) {
+                return floatval($product->get_price());
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Safely extracts individual item prices from cart
+     * 
+     * @param mixed $cart
+     * @return array
+     */
+    private function get_item_prices($cart)
+    {
+        $prices = [];
+        $cart_items = $this->get_cart_items($cart);
+
+        if (!is_array($cart_items)) {
             return [];
         }
 
@@ -76,34 +209,18 @@ class DiscountService {
                 continue;
             }
 
-            try {
-                // Handle price retrieval for both cart types with null checks
-                $product_data = $cart_item['data'] ?? $cart_item;
-                if (!$product_data) {
-                    continue;
-                }
-
-                $product_price = 0.0;
-                if (method_exists($product_data, 'get_price')) {
-                    $product_price = floatval($product_data->get_price() ?? 0);
-                } elseif (method_exists($cart_item, 'get_product')) {
-                    $product = $cart_item->get_product();
-                    if ($product && method_exists($product, 'get_price')) {
-                        $product_price = floatval($product->get_price() ?? 0);
-                    }
-                }
-
-                $quantity = intval($cart_item['quantity'] ?? $cart_item->get_quantity() ?? 1);
-
-                if ($product_price > 0 && $quantity > 0) {
-                    // Protect against unreasonably large quantities
-                    $quantity = min($quantity, 1000);
-                    for ($i = 0; $i < $quantity; $i++) {
-                        $prices[] = $product_price;
-                    }
-                }
-            } catch (\Exception $e) {
+            // Skip bundled items
+            if (isset($cart_item['bundled_by'])) {
                 continue;
+            }
+
+            $product_price = $this->get_item_price($cart_item);
+            $quantity = $this->get_item_quantity($cart_item);
+
+            if ($product_price > 0) {
+                for ($i = 0; $i < $quantity; $i++) {
+                    $prices[] = $product_price;
+                }
             }
         }
 

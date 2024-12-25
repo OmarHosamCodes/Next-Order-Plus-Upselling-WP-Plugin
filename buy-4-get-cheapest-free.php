@@ -1,12 +1,12 @@
 <?php
 /**
- * Plugin Name: Buy X Get Cheapest Free
- * Description: Automatically apply a discount to the cheapest product in the WooCommerce cart when x items are present. Compatible with both Classic and Block Cart/Checkout.
+ * Plugin Name: Buy 4 Get Cheapest Free
+ * Description: Automatically apply a discount to the cheapest product in the WooCommerce cart when 4 or more items are present. Compatible with both Classic and Block Cart/Checkout.
  * Version: 1.3.6
  * Author: SoM
- * Text Domain: buy-x-get-cheapest-free
+ * Text Domain: buy-4-get-cheapest-free
  * 
- * @package BuyXGetCheapestFree
+ * @package Buy4GetCheapestFree
  */
 
 /**
@@ -22,10 +22,10 @@ require_once plugin_dir_path(__FILE__) . 'services/AssetsService.php';
 require_once plugin_dir_path(__FILE__) . 'services/CartService.php';
 require_once plugin_dir_path(__FILE__) . 'services/CouponService.php';
 
-use BXG1F\Services\DiscountService;
-use BXG1F\Services\AssetsService;
-use BXG1F\Services\CartService;
-use BXG1F\Services\CouponService;
+use B4G1F\Services\DiscountService;
+use B4G1F\Services\AssetsService;
+use B4G1F\Services\CartService;
+use B4G1F\Services\CouponService;
 
 /**
  * Main plugin class implementing singleton pattern

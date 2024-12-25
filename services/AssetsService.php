@@ -1,5 +1,5 @@
 <?php
-namespace BXG1F\Services;
+namespace B4G1F\Services;
 
 /**
  * Class AssetsService
@@ -7,7 +7,7 @@ namespace BXG1F\Services;
  * Handles enqueueing and managing frontend assets (JS and CSS) for the Buy 4 Get 1 Free promotion.
  * Responsible for loading cart discount scripts, mini cart functionality, and custom styling.
  *
- * @package BXG1F\Services
+ * @package B4G1F\Services
  */
 class AssetsService {
     /**

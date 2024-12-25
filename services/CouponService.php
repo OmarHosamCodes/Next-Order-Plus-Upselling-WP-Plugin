@@ -1,13 +1,13 @@
 <?php
-namespace BXG1F\Services;
+namespace B4G1F\Services;
 
 /**
  * Class CouponService
  * 
- * Handles coupon validation and error message customization for the Buy 4 Get 1 Free (BXG1F) promotion.
+ * Handles coupon validation and error message customization for the Buy 4 Get 1 Free (B4G1F) promotion.
  * Ensures certain coupons cannot be used in combination with the Black Friday promotion.
  *
- * @package BXG1F\Services
+ * @package B4G1F\Services
  */
 class CouponService {
     /**
@@ -29,7 +29,7 @@ class CouponService {
      */
     public function validate_coupon($valid, $coupon) {
         if ($coupon && in_array($coupon->get_code(), $this->excluded_coupons)) {
-            wc_add_notice(__('الكوبون ده مش بيتطبق على عروض الـ بلاك فريداي', 'woocommerce'), 'error');
+            wc_add_notice(__('الكوبون ده مش بيتطبق على عروض 2025', 'woocommerce'), 'error');
             return false;
         }
         return $valid;
@@ -48,7 +48,7 @@ class CouponService {
      */
     public function modify_error_message($err, $err_code, $coupon) {
         if ($coupon && in_array($coupon->get_code(), $this->excluded_coupons)) {
-            return 'الكوبون ده مش بيتطبق على عروض الـ بلاك فريداي';
+            return 'الكوبون ده مش بيتطبق على عروض 2025';
         }
         return $err;
     }
