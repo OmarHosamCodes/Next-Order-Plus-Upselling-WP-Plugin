@@ -4,14 +4,8 @@ namespace B4G1F\Services;
 class DiscountService
 {
     const MIN_ITEMS_FOR_DISCOUNT = 4;
-
-    /**
-     * Calculates the total discount to apply based on cart contents
-     * 
-     * @param mixed $cart WooCommerce cart object
-     * @return float Total discount amount
-     */
-    public function calculate_discount($cart)
+    const MAX_PRICE_FOR_CHEAPEST = 110;
+ public function calculate_discount($cart)
     {
         // Return 0 if cart is null
         if ($cart === null) {
@@ -25,7 +19,7 @@ class DiscountService
 
         $total_items = $this->count_eligible_items($cart);
         
-        // Early return if not enough items
+        // Early return if not enough items for even one discount
         if ($total_items < self::MIN_ITEMS_FOR_DISCOUNT) {
             return 0;
         }
@@ -35,15 +29,38 @@ class DiscountService
             return 0;
         }
 
-        sort($prices);
-        $groups = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
-        $total_discount = 0;
+        sort($prices); // Sort prices in ascending order
 
-        for ($i = 0; $i < $groups; $i++) {
-            $total_discount += $prices[$i];
+        // Special case for 4-8 items
+        if ($total_items >= self::MIN_ITEMS_FOR_DISCOUNT && $total_items <= 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
+            // Check if cheapest item is less than MAX_PRICE_FOR_CHEAPEST
+            if ($prices[0] >= self::MAX_PRICE_FOR_CHEAPEST) {
+                return 0;
+            }
+            // Return second cheapest item's price as discount
+            return isset($prices[1]) ? $prices[1] : 0;
         }
 
-        return $total_discount;
+        // For multiples of MIN_ITEMS_FOR_DISCOUNT beyond 8 items
+        if ($total_items > 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
+            // Calculate number of complete sets
+            $complete_sets = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
+            
+            // For each complete set, we'll give the price of the cheapest item not yet discounted
+            $total_discount = 0;
+            
+            for ($i = 0; $i < $complete_sets; $i++) {
+                // For each set, get the cheapest remaining item's price
+                $cheapest_index = $i;
+                if (isset($prices[$cheapest_index])) {
+                    $total_discount += $prices[$cheapest_index];
+                }
+            }
+            
+            return $total_discount;
+        }
+
+        return 0;
     }
 
     /**
