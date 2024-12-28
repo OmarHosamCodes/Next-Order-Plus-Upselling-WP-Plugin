@@ -33,32 +33,34 @@ class DiscountService
         }
 
         $prices = $this->get_item_prices($cart);
+        error_log('Initial prices array: ' . print_r($prices, true));
+
         if (empty($prices)) {
             return 0;
         }
 
-        sort($prices); // Sort prices in ascending order
+        sort($prices);
+        error_log('Sorted prices array: ' . print_r($prices, true));
+
+        $complete_sets = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
 
         // Special case for 4-7 items and cheapest item is less than MAX_PRICE_FOR_CHEAPEST
-        if ($total_items >= self::MIN_ITEMS_FOR_DISCOUNT && $total_items < 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
-            // Check if cheapest item is less than MAX_PRICE_FOR_CHEAPEST
+        if ($total_items >= self::MIN_ITEMS_FOR_DISCOUNT && $total_items % self::MIN_ITEMS_FOR_DISCOUNT !== 0) {
+            $prices = array_values(array_unique($prices));
+            error_log('Unique prices array (first check): ' . print_r($prices, true));
+
             if ($prices[0] >= self::MAX_PRICE_FOR_CHEAPEST) {
-                return $prices[0];
+                return $complete_sets * $prices[0];
             }
-            // Return second cheapest item's price as discount
-            return isset($prices[1]) ? $prices[1] : 0;
+
+            return isset($prices[1]) ? $complete_sets * $prices[1] : 0;
         }
 
         // For multiples of MIN_ITEMS_FOR_DISCOUNT (8 items or more)
-        if ($total_items >= 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
-            // Calculate number of complete sets
-            $complete_sets = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
-
-            // For each complete set, we'll give the price of the cheapest item not yet discounted
-            $total_discount = 0;
-
+        if ($total_items % self::MIN_ITEMS_FOR_DISCOUNT === 0) {
+            $prices = array_values(array_unique($prices));
+            error_log('Unique prices array (complete sets): ' . print_r($prices, true));
             $total_discount = $complete_sets * $prices[0];
-
             return $total_discount;
         }
         return 0;
