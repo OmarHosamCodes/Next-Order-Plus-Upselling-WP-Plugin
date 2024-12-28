@@ -1,12 +1,13 @@
 <?php
+
 namespace B4G1F\Services;
 
 class DiscountService
 {
     const MIN_ITEMS_FOR_DISCOUNT = 4;
     const MAX_PRICE_FOR_CHEAPEST = 110;
-    
-  /**
+
+    /**
      * Calculates the total discount to apply based on cart contents
      * 
      * @param mixed $cart WooCommerce cart object
@@ -25,7 +26,7 @@ class DiscountService
         }
 
         $total_items = $this->count_eligible_items($cart);
-        
+
         // Early return if not enough items for even one discount
         if ($total_items < self::MIN_ITEMS_FOR_DISCOUNT) {
             return 0;
@@ -38,32 +39,30 @@ class DiscountService
 
         sort($prices); // Sort prices in ascending order
 
-        // Get the number of complete sets and remainder
-        $complete_sets = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
-        $remainder = $total_items % self::MIN_ITEMS_FOR_DISCOUNT;
-
-        // If it's exactly a multiple of MIN_ITEMS_FOR_DISCOUNT
-        if ($remainder === 0) {
-            return $complete_sets * $prices[0];
-        }
-
-        // If it's one more than a multiple of MIN_ITEMS_FOR_DISCOUNT through one less than the next multiple
-        // Example: for MIN_ITEMS_FOR_DISCOUNT = 4
-        // This handles items 5-7, 9-11, 13-15, etc.
-        if ($remainder > 0 && $remainder < self::MIN_ITEMS_FOR_DISCOUNT - 1) {
-            // Check if cheapest item is less than MAX_PRICE_FOR_CHEAPEST for the extra items case
+        // Special case for 4-7 items and cheapest item is less than MAX_PRICE_FOR_CHEAPEST
+        if ($total_items >= self::MIN_ITEMS_FOR_DISCOUNT && $total_items < 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
+            // Check if cheapest item is less than MAX_PRICE_FOR_CHEAPEST
             if ($prices[0] >= self::MAX_PRICE_FOR_CHEAPEST) {
-                return $prices[0] + ($complete_sets * $prices[0]);
+                return $prices[0];
             }
-            // Return second cheapest item's price as discount for the extra items,
-            // plus the normal discount for complete sets
-            return (isset($prices[1]) ? $prices[1] : 0) + ($complete_sets * $prices[0]);
+            // Return second cheapest item's price as discount
+            return isset($prices[1]) ? $prices[1] : 0;
         }
 
-        // For any other number of items, apply the complete sets discount
-        return $complete_sets * $prices[0];
-    }
+        // For multiples of MIN_ITEMS_FOR_DISCOUNT (8 items or more)
+        if ($total_items >= 2 * self::MIN_ITEMS_FOR_DISCOUNT) {
+            // Calculate number of complete sets
+            $complete_sets = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
 
+            // For each complete set, we'll give the price of the cheapest item not yet discounted
+            $total_discount = 0;
+
+            $total_discount = $complete_sets * $prices[0];
+
+            return $total_discount;
+        }
+        return 0;
+    }
 
     /**
      * Validates if the provided cart object is usable
@@ -117,10 +116,12 @@ class DiscountService
             }
 
             // For product bundles
-            if (isset($cart_item['data']) && 
-                is_object($cart_item['data']) && 
-                method_exists($cart_item['data'], 'is_type') && 
-                $cart_item['data']->is_type('bundle')) {
+            if (
+                isset($cart_item['data']) &&
+                is_object($cart_item['data']) &&
+                method_exists($cart_item['data'], 'is_type') &&
+                $cart_item['data']->is_type('bundle')
+            ) {
                 $count += $this->get_item_quantity($cart_item);
                 continue;
             }
@@ -191,9 +192,11 @@ class DiscountService
         }
 
         // Classic cart item
-        if (isset($cart_item['data']) && 
-            is_object($cart_item['data']) && 
-            method_exists($cart_item['data'], 'get_price')) {
+        if (
+            isset($cart_item['data']) &&
+            is_object($cart_item['data']) &&
+            method_exists($cart_item['data'], 'get_price')
+        ) {
             return floatval($cart_item['data']->get_price());
         }
 
