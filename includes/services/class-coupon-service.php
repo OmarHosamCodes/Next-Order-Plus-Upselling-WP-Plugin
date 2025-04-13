@@ -26,16 +26,37 @@ class NOP_Coupon_Service extends NOP_Base
     private $excluded_coupons;
 
     /**
+     * Admin service instance for settings
+     *
+     * @var NOP_Admin_Service|null
+     */
+    private $admin_service;
+
+    /**
      * Constructor
      *
      * Sets up excluded coupons
      *
      * @param NOP_Logger|null $logger Optional logger instance
+     * @param NOP_Admin_Service|null $admin_service Optional admin service for settings
      */
-    public function __construct($logger = null)
+    public function __construct($logger = null, $admin_service = null)
     {
         parent::__construct($logger);
+        $this->admin_service = $admin_service;
+
+        // Default excluded coupons
         $this->excluded_coupons = ['gtre50', 'abon-150'];
+
+        // If admin service is available, get settings from it
+        if ($this->admin_service instanceof NOP_Admin_Service) {
+            $options = $this->admin_service->get_options();
+
+            if (isset($options['excluded_coupons']) && !empty($options['excluded_coupons'])) {
+                $coupons = explode(',', $options['excluded_coupons']);
+                $this->excluded_coupons = array_map('trim', $coupons);
+            }
+        }
 
         // Allow filtering excluded coupons
         $this->excluded_coupons = apply_filters(

@@ -1,6 +1,6 @@
 # Next Order Plus
 
-A highly optimized WooCommerce plugin that automatically applies a "Buy 4, Get the Cheapest Free" promotional discount.
+A highly optimized WooCommerce plugin that automatically applies a "Next Order Plus Upselling Features" promotional discount.
 
 ## Features
 
@@ -10,6 +10,8 @@ A highly optimized WooCommerce plugin that automatically applies a "Buy 4, Get t
 - **Mini-Cart Support**: Displays the discount in the mini cart dropdown.
 - **Shipping Rule Integration**: Optionally disables free shipping when discount is applied.
 - **Coupon Restrictions**: Prevents specific coupons from being used together with this promotion.
+- **Admin Settings**: Fully customizable through dedicated admin interface.
+- **Order Statistics**: Track the total number and amount of discounts applied.
 
 ## Technical Architecture
 
@@ -24,6 +26,7 @@ A highly optimized WooCommerce plugin that automatically applies a "Buy 4, Get t
    - `NOP_Cart_Service`: Cart interaction and discount application
    - `NOP_Assets_Service`: JS/CSS resource management
    - `NOP_Coupon_Service`: Coupon validation and error handling
+   - `NOP_Admin_Service`: Admin interface and settings management
 
 3. **Utility Classes**:
    - `NOP_Logger`: Debug logging capabilities
@@ -41,14 +44,26 @@ A highly optimized WooCommerce plugin that automatically applies a "Buy 4, Get t
 1. Upload the `next-order-plus` folder to the `/wp-content/plugins/` directory
 2. Activate the plugin through the 'Plugins' menu in WordPress
 3. Ensure WooCommerce is installed and activated
+4. Configure settings via WooCommerce > Next Order Plus or SOM Plugins > Next Order Plus
+
+## Admin Settings
+
+The plugin offers a comprehensive settings page with the following options:
+
+- **Discount Label**: Customize the text displayed in the cart/checkout
+- **Minimum Items**: Set the threshold for when the discount applies (default: 4)
+- **Excluded Coupons**: Specify coupon codes that cannot be used with this promotion
+- **Disable Free Shipping**: Option to disable free shipping when discount is applied
+- **Debug Mode**: Enable/disable detailed logging for troubleshooting
 
 ## Customization
 
-The plugin provides several filters for customization:
+The plugin provides several filters for programmatic customization:
 
 - `nop_excluded_coupons`: Modify the list of disallowed coupons
 - `nop_load_assets_globally`: Control whether assets are loaded on all pages
 - `nop_discount_label`: Customize the discount label text
+- `nop_min_items_for_discount`: Override the minimum items required for discount
 
 ## Compatibility
 

@@ -32,6 +32,7 @@ require_once NOP_DIR . 'includes/services/class-discount-service.php';
 require_once NOP_DIR . 'includes/services/class-assets-service.php';
 require_once NOP_DIR . 'includes/services/class-cart-service.php';
 require_once NOP_DIR . 'includes/services/class-coupon-service.php';
+require_once NOP_DIR . 'includes/services/class-admin-service.php';
 
 /**
  * Main plugin class implementing singleton pattern
@@ -57,12 +58,14 @@ class NOP_Plugin
      * @var NOP\Services\NOP_Assets_Service Manages frontend assets
      * @var NOP\Services\NOP_Cart_Service Handles cart operations
      * @var NOP\Services\NOP_Coupon_Service Manages coupon validations
+     * @var NOP\Services\NOP_Admin_Service Handles admin interface and settings
      * @var NOP\Util\NOP_Logger Handles debugging and logging
      */
     private $discount_service;
     private $assets_service;
     private $cart_service;
     private $coupon_service;
+    private $admin_service;
     private $logger;
 
     /**
@@ -107,14 +110,26 @@ class NOP_Plugin
         // Initialize logger first for debugging
         $this->logger = new NOP\Util\NOP_Logger();
 
-        // Core services
-        $this->discount_service = new NOP\Services\NOP_Discount_Service($this->logger);
+        // Initialize admin service first to get settings
+        $this->admin_service = new NOP\Services\NOP_Admin_Service($this->logger);
+
+        // Get plugin options
+        $options = $this->admin_service->get_options();
+
+        // Set debug mode from settings if available
+        if (isset($options['debug_mode'])) {
+            define('NOP_DEBUG_RUNTIME', (bool) $options['debug_mode']);
+        }
+
+        // Core services with admin service dependency
+        $this->discount_service = new NOP\Services\NOP_Discount_Service($this->logger, $this->admin_service);
         $this->assets_service = new NOP\Services\NOP_Assets_Service($this->logger);
-        $this->cart_service = new NOP\Services\NOP_Cart_Service($this->discount_service, $this->logger);
-        $this->coupon_service = new NOP\Services\NOP_Coupon_Service($this->logger);
+        $this->cart_service = new NOP\Services\NOP_Cart_Service($this->discount_service, $this->logger, $this->admin_service);
+        $this->coupon_service = new NOP\Services\NOP_Coupon_Service($this->logger, $this->admin_service);
 
         // Initialize all services
         $this->logger->init();
+        $this->admin_service->init();
         $this->discount_service->init();
         $this->assets_service->init();
         $this->cart_service->init();
@@ -163,6 +178,19 @@ class NOP_Plugin
 
         // Debug log action
         add_action('nop_log_event', [$this->logger, 'log_event'], 10, 2);
+    }
+
+    /**
+     * Get admin service instance
+     * 
+     * Allows external access to the admin service for settings
+     * 
+     * @since 1.0.0
+     * @return NOP\Services\NOP_Admin_Service Admin service instance
+     */
+    public function get_admin_service(): NOP\Services\NOP_Admin_Service
+    {
+        return $this->admin_service;
     }
 }
 

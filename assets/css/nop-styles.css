@@ -1,62 +1,130 @@
 /**
- * Next Order Plus - Main Styles
- * 
- * CSS for the Next Order Plus discount display.
- * Includes styles for both classic and block-based cart/checkout.
+ * Next Order Plus - Admin Styles
+ *
+ * CSS for the Next Order Plus admin interface.
  */
 
-/* Discount fee display styling */
-.wp-block-woocommerce-checkout-order-summary-fee-block, 
-.wc-block-components-totals-fees {
-    color: #EF5A59 !important;
-    font-weight: 500;
+/* Admin layout */
+.nop-admin-content {
+	display: flex;
+	gap: 20px;
+	margin-top: 20px;
 }
 
-/* Classic cart discount styling */
-.cart_totals .cart-discount td {
-    color: #EF5A59;
+.nop-admin-main {
+	flex: 2;
 }
 
-/* Mini cart discount styling */
-.mini-cart-discount {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-top: 1px solid #eee;
-    color: #292929;
-    font-weight: inherit;
-    font-size: initial;
+.nop-admin-sidebar {
+	flex: 1;
+	max-width: 400px;
 }
 
-.mini-cart-discount-label {
-    padding-left: 5px;
+/* Admin boxes */
+.nop-admin-box {
+	background: #fff;
+	border: 1px solid #ccd0d4;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	padding: 15px;
+	margin-bottom: 20px;
 }
 
-.mini-cart-discount-amount {
-    color: #EF5A59;
-    padding-right: 5px;
-    font-weight: 500;
+.nop-admin-box h3 {
+	margin-top: 0;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #eee;
 }
 
-/* Cart block discount display */
-.wc-block-components-totals-discount {
-    color: #EF5A59;
+.nop-admin-box ul {
+	list-style-type: disc;
+	padding-left: 20px;
 }
 
-/* RTL Support */
-.rtl .mini-cart-discount-label {
-    padding-left: 0;
-    padding-right: 5px;
+/* Setting fields */
+.nop-admin-field {
+	margin-bottom: 15px;
 }
 
-.rtl .mini-cart-discount-amount {
-    padding-right: 0;
-    padding-left: 5px;
+.nop-admin-field label {
+	display: block;
+	margin-bottom: 5px;
+	font-weight: 500;
 }
 
-/* Mobile optimization */
-@media (max-width: 768px) {
-    .mini-cart-discount {
-        font-size: 0.9em;
-    }
+.nop-admin-field input[type="text"],
+.nop-admin-field input[type="number"],
+.nop-admin-field textarea {
+	width: 100%;
+}
+
+.nop-admin-field .description {
+	color: #666;
+	font-style: italic;
+	margin-top: 5px;
+}
+
+/* Status indicators */
+.nop-status {
+	display: inline-block;
+	padding: 4px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.nop-status-active {
+	background-color: #edfaef;
+	color: #1e7e34;
+}
+
+.nop-status-inactive {
+	background-color: #f8f9fa;
+	color: #6c757d;
+}
+
+.nop-status-error {
+	background-color: #fbeaea;
+	color: #dc3545;
+}
+
+/* Statistics */
+.nop-stats-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 15px;
+	margin-top: 15px;
+}
+
+.nop-stats-card {
+	background: #f8f9fa;
+	border-radius: 4px;
+	padding: 15px;
+	text-align: center;
+}
+
+.nop-stats-value {
+	font-size: 24px;
+	font-weight: 600;
+	color: #23282d;
+	margin: 10px 0;
+}
+
+.nop-stats-label {
+	color: #646970;
+	font-size: 13px;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 782px) {
+	.nop-admin-content {
+		flex-direction: column;
+	}
+
+	.nop-admin-sidebar {
+		max-width: none;
+	}
+
+	.nop-stats-grid {
+		grid-template-columns: 1fr;
+	}
 }

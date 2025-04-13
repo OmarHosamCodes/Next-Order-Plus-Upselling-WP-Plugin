@@ -20,8 +20,44 @@ class NOP_Discount_Service extends NOP_Base
 {
     /**
      * Minimum number of items required for the discount to apply
+     *
+     * @var int
      */
-    const MIN_ITEMS_FOR_DISCOUNT = 4;
+    private $min_items_for_discount;
+
+    /**
+     * Admin service instance for settings
+     *
+     * @var NOP_Admin_Service|null
+     */
+    private $admin_service;
+
+    /**
+     * Constructor
+     *
+     * @param NOP_Logger|null $logger Optional logger instance
+     * @param NOP_Admin_Service|null $admin_service Optional admin service for settings
+     */
+    public function __construct($logger = null, $admin_service = null)
+    {
+        parent::__construct($logger);
+        $this->admin_service = $admin_service;
+
+        // Set default minimum items
+        $this->min_items_for_discount = 4;
+
+        // If admin service is available, get settings from it
+        if ($this->admin_service instanceof NOP_Admin_Service) {
+            $options = $this->admin_service->get_options();
+            $this->min_items_for_discount = isset($options['min_items']) ? absint($options['min_items']) : 4;
+        }
+
+        // Allow filtering minimum items
+        $this->min_items_for_discount = apply_filters(
+            $this->prefix . 'min_items_for_discount',
+            $this->min_items_for_discount
+        );
+    }
 
     /**
      * Initialize the service
@@ -33,7 +69,7 @@ class NOP_Discount_Service extends NOP_Base
     public function init(): void
     {
         // No direct hooks needed for this service
-        $this->log('Discount service initialized');
+        $this->log('Discount service initialized with minimum items: ' . $this->min_items_for_discount);
     }
 
     /**
@@ -60,7 +96,7 @@ class NOP_Discount_Service extends NOP_Base
         $this->log("Total eligible items in cart: {$total_items}");
 
         // Early return if not enough items
-        if ($total_items < self::MIN_ITEMS_FOR_DISCOUNT) {
+        if ($total_items < $this->min_items_for_discount) {
             return 0;
         }
 
@@ -72,7 +108,7 @@ class NOP_Discount_Service extends NOP_Base
 
         // Sort prices to get cheapest items first
         sort($prices);
-        $groups = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
+        $groups = floor($total_items / $this->min_items_for_discount);
         $total_discount = 0;
 
         // Calculate discount based on cheapest items

@@ -36,7 +36,10 @@ class NOP_Logger
      */
     public function __construct()
     {
-        $this->debug_enabled = defined('NOP_DEBUG') && NOP_DEBUG;
+        // Check for runtime debug mode (set by admin settings)
+        $this->debug_enabled = (defined('NOP_DEBUG') && NOP_DEBUG) ||
+            (defined('NOP_DEBUG_RUNTIME') && NOP_DEBUG_RUNTIME);
+
         $this->log_file = WP_CONTENT_DIR . '/debug-logs/nop-debug.log';
     }
 
@@ -64,6 +67,10 @@ class NOP_Logger
      */
     public function log_event(string $message, string $level = 'info'): void
     {
+        // Check runtime debug setting which can be changed in admin
+        $this->debug_enabled = (defined('NOP_DEBUG') && NOP_DEBUG) ||
+            (defined('NOP_DEBUG_RUNTIME') && NOP_DEBUG_RUNTIME);
+
         if (!$this->debug_enabled) {
             return;
         }

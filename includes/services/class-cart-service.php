@@ -33,18 +33,56 @@ class NOP_Cart_Service extends NOP_Base
     private $discount_label;
 
     /**
+     * Admin service instance for settings
+     *
+     * @var NOP_Admin_Service|null
+     */
+    private $admin_service;
+
+    /**
+     * Whether to disable free shipping when discount is applied
+     *
+     * @var bool
+     */
+    private $disable_free_shipping;
+
+    /**
      * Constructor
      *
      * Sets up discount service dependency
      *
      * @param NOP_Discount_Service $discount_service Discount calculation service
      * @param NOP_Logger|null $logger Optional logger instance
+     * @param NOP_Admin_Service|null $admin_service Optional admin service for settings
      */
-    public function __construct(NOP_Discount_Service $discount_service, $logger = null)
+    public function __construct(NOP_Discount_Service $discount_service, $logger = null, $admin_service = null)
     {
         parent::__construct($logger);
         $this->discount_service = $discount_service;
+        $this->admin_service = $admin_service;
+
+        // Default values
         $this->discount_label = __('Discount: 2025 Promotion', 'next-order-plus');
+        $this->disable_free_shipping = true;
+
+        // If admin service is available, get settings from it
+        if ($this->admin_service instanceof NOP_Admin_Service) {
+            $options = $this->admin_service->get_options();
+
+            if (isset($options['discount_label']) && !empty($options['discount_label'])) {
+                $this->discount_label = $options['discount_label'];
+            }
+
+            if (isset($options['disable_free_shipping'])) {
+                $this->disable_free_shipping = (bool) $options['disable_free_shipping'];
+            }
+        }
+
+        // Allow filtering discount label
+        $this->discount_label = apply_filters(
+            $this->prefix . 'discount_label',
+            $this->discount_label
+        );
     }
 
     /**
@@ -56,7 +94,7 @@ class NOP_Cart_Service extends NOP_Base
      */
     public function init(): void
     {
-        $this->log('Cart service initialized');
+        $this->log('Cart service initialized with label: ' . $this->discount_label);
     }
 
     /**
@@ -160,6 +198,11 @@ class NOP_Cart_Service extends NOP_Base
      */
     public function remove_free_shipping_when_discount_applied(array $rates, array $package): array
     {
+        // Skip if free shipping shouldn't be disabled
+        if (!$this->disable_free_shipping) {
+            return $rates;
+        }
+
         $discount = 0;
 
         if (function_exists('WC') && WC()->session) {
