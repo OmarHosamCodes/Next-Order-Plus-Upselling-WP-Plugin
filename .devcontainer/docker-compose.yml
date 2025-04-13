@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  wordpress:
+    image: wordpress:latest
+    restart: always
+    ports:
+      - "8082:80" # WordPress on port 8082
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: school_index
+      WORDPRESS_DB_PASSWORD: index
+      WORDPRESS_DB_NAME: school_demo
+    volumes:
+      - wp_dev_data:/var/www/html
+      - ../:/var/www/html/wp-content/plugins
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:10.11.10
+    restart: always
+    environment:
+      MARIADB_DATABASE: school_demo
+      MARIADB_USER: school_index
+      MARIADB_PASSWORD: index
+      MARIADB_ROOT_PASSWORD: index
+      MARIADB_CONNECT_TIMEOUT: 600
+      MARIADB_WAIT_TIMEOUT: 86400
+      MARIADB_INTERACTIVE_TIMEOUT: 86400
+    volumes:
+      - wp_dev_db_data:/var/lib/mysql
+    command: --max_allowed_packet=128M --wait_timeout=86400 --interactive_timeout=86400
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    ports:
+      - "8081:80" # phpMyAdmin on port 8081
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: school_index
+      PMA_PASSWORD: index
+      UPLOAD_LIMIT: 300M
+      MAX_EXECUTION_TIME: 86400
+      MEMORY_LIMIT: 512M
+    volumes:
+      - ./php.ini:/usr/local/etc/php/conf.d/php-custom.ini
+
+volumes:
+  wp_dev_data:
+  wp_dev_db_data:

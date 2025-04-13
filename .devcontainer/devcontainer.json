@@ -1,0 +1,31 @@
+{
+    "name": "School Of Marketing",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "wordpress",
+    "workspaceFolder": "/var/www/html",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "formulahendry.auto-close-tag",
+                "steoates.autoimport",
+                "formulahendry.auto-rename-tag",
+                "biomejs.biome",
+                "aaron-bond.better-comments",
+                "adpyke.codesnap",
+                "GitHub.vscode-pull-request-github",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "heybourn.headwind",
+                "DEVSENSE.intelli-php-vscode",
+                "kisstkondoros.vscode-gutter-preview",
+                "ms-vscode.vscode-typescript-next",
+                "christian-kohler.path-intellisense",
+                "DEVSENSE.phptools-vscode",
+                "miguelsolorio.symbols",
+                "bradlc.vscode-tailwindcss",
+                "austenc.tailwind-docs",
+                "stivo.tailwind-fold"
+            ]
+        }
+    }
+}
