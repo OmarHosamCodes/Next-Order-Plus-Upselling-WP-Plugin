@@ -1,11 +1,9 @@
 <?php
-
 namespace B4G1F\Services;
 
 class DiscountService
 {
     const MIN_ITEMS_FOR_DISCOUNT = 4;
-    const MAX_PRICE_FOR_CHEAPEST = 110;
 
     /**
      * Calculates the total discount to apply based on cart contents
@@ -26,44 +24,26 @@ class DiscountService
         }
 
         $total_items = $this->count_eligible_items($cart);
-
-        // Early return if not enough items for even one discount
+        
+        // Early return if not enough items
         if ($total_items < self::MIN_ITEMS_FOR_DISCOUNT) {
             return 0;
         }
 
         $prices = $this->get_item_prices($cart);
-        error_log('Initial prices array: ' . print_r($prices, true));
-
         if (empty($prices)) {
             return 0;
         }
 
         sort($prices);
-        error_log('Sorted prices array: ' . print_r($prices, true));
+        $groups = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
+        $total_discount = 0;
 
-        $complete_sets = floor($total_items / self::MIN_ITEMS_FOR_DISCOUNT);
-
-        // Special case for 4-7 items and cheapest item is less than MAX_PRICE_FOR_CHEAPEST
-        if ($total_items >= self::MIN_ITEMS_FOR_DISCOUNT && $total_items % self::MIN_ITEMS_FOR_DISCOUNT !== 0) {
-            $prices = array_values(array_unique($prices));
-            error_log('Unique prices array (first check): ' . print_r($prices, true));
-
-            if ($prices[0] >= self::MAX_PRICE_FOR_CHEAPEST) {
-                return $complete_sets * $prices[0];
-            }
-
-            return isset($prices[1]) ? $complete_sets * $prices[1] : 0;
+        for ($i = 0; $i < $groups; $i++) {
+            $total_discount += $prices[$i];
         }
 
-        // For multiples of MIN_ITEMS_FOR_DISCOUNT (8 items or more)
-        if ($total_items % self::MIN_ITEMS_FOR_DISCOUNT === 0) {
-            $prices = array_values(array_unique($prices));
-            error_log('Unique prices array (complete sets): ' . print_r($prices, true));
-            $total_discount = $complete_sets * $prices[0];
-            return $total_discount;
-        }
-        return 0;
+        return $total_discount;
     }
 
     /**
@@ -118,12 +98,10 @@ class DiscountService
             }
 
             // For product bundles
-            if (
-                isset($cart_item['data']) &&
-                is_object($cart_item['data']) &&
-                method_exists($cart_item['data'], 'is_type') &&
-                $cart_item['data']->is_type('bundle')
-            ) {
+            if (isset($cart_item['data']) && 
+                is_object($cart_item['data']) && 
+                method_exists($cart_item['data'], 'is_type') && 
+                $cart_item['data']->is_type('bundle')) {
                 $count += $this->get_item_quantity($cart_item);
                 continue;
             }
@@ -194,11 +172,9 @@ class DiscountService
         }
 
         // Classic cart item
-        if (
-            isset($cart_item['data']) &&
-            is_object($cart_item['data']) &&
-            method_exists($cart_item['data'], 'get_price')
-        ) {
+        if (isset($cart_item['data']) && 
+            is_object($cart_item['data']) && 
+            method_exists($cart_item['data'], 'get_price')) {
             return floatval($cart_item['data']->get_price());
         }
 

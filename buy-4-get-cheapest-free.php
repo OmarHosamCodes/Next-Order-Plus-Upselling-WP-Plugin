@@ -1,9 +1,8 @@
 <?php
-
 /**
  * Plugin Name: Buy 4 Get Cheapest Free
  * Description: Automatically apply a discount to the cheapest product in the WooCommerce cart when 4 or more items are present. Compatible with both Classic and Block Cart/Checkout.
- * Version: 1.4.5
+ * Version: 1.3.6
  * Author: SoM
  * Text Domain: buy-4-get-cheapest-free
  * 
@@ -125,7 +124,7 @@ class Plugin
         add_action('woocommerce_cart_calculate_fees', [$this->cart_service, 'apply_cart_discount'], 20);
         add_action('woocommerce_checkout_create_order', [$this->cart_service, 'save_discount_to_order'], 20, 2);
         add_action('woocommerce_before_calculate_totals', [$this->cart_service, 'apply_discount_persistently'], 10);
-
+        
         // Block Cart and Checkout compatibility hooks
         add_action('woocommerce_store_api_cart_update_customer_from_request', [$this->cart_service, 'apply_cart_discount']);
         add_action('woocommerce_store_api_cart_update_order_from_request', [$this->cart_service, 'apply_cart_discount']); // updated

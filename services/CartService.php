@@ -48,11 +48,11 @@ class CartService {
     private function add_discount_fee($cart, $discount) {
         if (method_exists($cart, 'add_fee')) {
             // Classic Cart
-            $cart->add_fee(__('خصم: البلاك فريداي', 'buy-4-get-cheapest-free'), -$discount, false);
+            $cart->add_fee(__('خصم: عروض 2025', 'buy-4-get-cheapest-free'), -$discount, false);
         } else {
             // Block Cart
             $cart->add_fee([
-                'name' => __('خصم: البلاك فريداي', 'buy-4-get-cheapest-free'),
+                'name' => __('خصم: عروض 2025', 'buy-4-get-cheapest-free'),
                 'amount' => -$discount,
                 'taxable' => false,
             ]);
@@ -95,7 +95,7 @@ class CartService {
 
         if ($discount_amount > 0) {
             $item = new \WC_Order_Item_Fee();
-            $item->set_name(__('خصم: البلاك فريداي', 'buy-4-get-cheapest-free'));
+            $item->set_name(__('خصم: عروض 2025', 'buy-4-get-cheapest-free'));
             $item->set_amount(-$discount_amount);
             $item->set_total(-$discount_amount);
             $order->add_item($item);
@@ -130,7 +130,7 @@ class CartService {
         if ($discount > 0) {
             ?>
             <div class="mini-cart-discount">
-                <span class="mini-cart-discount-label"><?php _e('خصم: البلاك فريداي', 'buy-4-get-cheapest-free'); ?></span>
+                <span class="mini-cart-discount-label"><?php _e('خصم: عروض 2025', 'buy-4-get-cheapest-free'); ?></span>
                 <span class="mini-cart-discount-amount">-<?php echo wc_price($discount); ?></span>
             </div>
             <?php
@@ -148,7 +148,7 @@ class CartService {
         if ($discount > 0) {
             ?>
             <div class="mini-cart-discount">
-                <span class="mini-cart-discount-label"><?php _e('خصم: البلاك فريداي', 'buy-4-get-cheapest-free'); ?></span>
+                <span class="mini-cart-discount-label"><?php _e('خصم: عروض 2025', 'buy-4-get-cheapest-free'); ?></span>
                 <span class="mini-cart-discount-amount">-<?php echo wc_price($discount); ?></span>
             </div>
             <?php
