@@ -1,12 +1,12 @@
 <?php
 /**
- * Plugin Name: Buy 4 Get Cheapest Free
- * Description: Automatically apply a discount to the cheapest product in the WooCommerce cart when 4 or more items are present. Compatible with both Classic and Block Cart/Checkout.
- * Version: 1.3.6
+ * Plugin Name: Next Order Plus
+ * Description: Enhanced WooCommerce promotion system. Buy 4 or more products and get the cheapest one free. Compatible with both Classic and Block Cart/Checkout.
+ * Version: 1.0.0
  * Author: SoM
- * Text Domain: buy-4-get-cheapest-free
+ * Text Domain: next-order-plus
  * 
- * @package Buy4GetCheapestFree
+ * @package NextOrderPlus
  */
 
 /**
@@ -16,46 +16,54 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Include service classes
-require_once plugin_dir_path(__FILE__) . 'services/DiscountService.php';
-require_once plugin_dir_path(__FILE__) . 'services/AssetsService.php';
-require_once plugin_dir_path(__FILE__) . 'services/CartService.php';
-require_once plugin_dir_path(__FILE__) . 'services/CouponService.php';
+// Define plugin constants
+define('NOP_VERSION', '1.0.0');
+define('NOP_PREFIX', 'nop_');
+define('NOP_DIR', plugin_dir_path(__FILE__));
+define('NOP_URL', plugin_dir_url(__FILE__));
+define('NOP_DEBUG', false); // Set to true for development
 
-use B4G1F\Services\DiscountService;
-use B4G1F\Services\AssetsService;
-use B4G1F\Services\CartService;
-use B4G1F\Services\CouponService;
+// Load core files
+require_once NOP_DIR . 'includes/base/class-base.php';
+require_once NOP_DIR . 'includes/util/class-logger.php';
+
+// Load service classes
+require_once NOP_DIR . 'includes/services/class-discount-service.php';
+require_once NOP_DIR . 'includes/services/class-assets-service.php';
+require_once NOP_DIR . 'includes/services/class-cart-service.php';
+require_once NOP_DIR . 'includes/services/class-coupon-service.php';
 
 /**
  * Main plugin class implementing singleton pattern
  * 
- * Handles initialization of services and hooks for the Buy 4 Get Cheapest Free promotion.
+ * Manages initialization of services and hooks for the Next Order Plus promotion system.
  * Ensures compatibility with both Classic and Block Cart/Checkout interfaces.
  * 
  * @since 1.0.0
  */
-class Plugin
+class NOP_Plugin
 {
     /**
      * Singleton instance of the plugin
      *
-     * @var Plugin|null
+     * @var NOP_Plugin|null
      */
     private static $instance = null;
 
     /**
      * Service instances
      *
-     * @var DiscountService Handles discount calculations
-     * @var AssetsService Manages frontend assets
-     * @var CartService Handles cart operations
-     * @var CouponService Manages coupon validations
+     * @var NOP\Services\NOP_Discount_Service Handles discount calculations
+     * @var NOP\Services\NOP_Assets_Service Manages frontend assets
+     * @var NOP\Services\NOP_Cart_Service Handles cart operations
+     * @var NOP\Services\NOP_Coupon_Service Manages coupon validations
+     * @var NOP\Util\NOP_Logger Handles debugging and logging
      */
     private $discount_service;
     private $assets_service;
     private $cart_service;
     private $coupon_service;
+    private $logger;
 
     /**
      * Get singleton instance of the plugin
@@ -63,9 +71,9 @@ class Plugin
      * Creates new instance if one doesn't exist, otherwise returns existing instance
      *
      * @since 1.0.0
-     * @return Plugin Singleton instance
+     * @return NOP_Plugin Singleton instance
      */
-    public static function getInstance()
+    public static function get_instance(): self
     {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -94,12 +102,23 @@ class Plugin
      * @since 1.0.0
      * @return void
      */
-    private function init_services()
+    private function init_services(): void
     {
-        $this->discount_service = new DiscountService();
-        $this->assets_service = new AssetsService();
-        $this->cart_service = new CartService($this->discount_service);
-        $this->coupon_service = new CouponService();
+        // Initialize logger first for debugging
+        $this->logger = new NOP\Util\NOP_Logger();
+
+        // Core services
+        $this->discount_service = new NOP\Services\NOP_Discount_Service($this->logger);
+        $this->assets_service = new NOP\Services\NOP_Assets_Service($this->logger);
+        $this->cart_service = new NOP\Services\NOP_Cart_Service($this->discount_service, $this->logger);
+        $this->coupon_service = new NOP\Services\NOP_Coupon_Service($this->logger);
+
+        // Initialize all services
+        $this->logger->init();
+        $this->discount_service->init();
+        $this->assets_service->init();
+        $this->cart_service->init();
+        $this->coupon_service->init();
     }
 
     /**
@@ -115,7 +134,7 @@ class Plugin
      * @since 1.0.0
      * @return void
      */
-    private function init_hooks()
+    private function init_hooks(): void
     {
         // Enqueue frontend assets
         add_action('wp_enqueue_scripts', [$this->assets_service, 'enqueue_assets']);
@@ -124,10 +143,10 @@ class Plugin
         add_action('woocommerce_cart_calculate_fees', [$this->cart_service, 'apply_cart_discount'], 20);
         add_action('woocommerce_checkout_create_order', [$this->cart_service, 'save_discount_to_order'], 20, 2);
         add_action('woocommerce_before_calculate_totals', [$this->cart_service, 'apply_discount_persistently'], 10);
-        
+
         // Block Cart and Checkout compatibility hooks
         add_action('woocommerce_store_api_cart_update_customer_from_request', [$this->cart_service, 'apply_cart_discount']);
-        add_action('woocommerce_store_api_cart_update_order_from_request', [$this->cart_service, 'apply_cart_discount']); // updated
+        add_action('woocommerce_store_api_cart_update_order_from_request', [$this->cart_service, 'apply_cart_discount']);
         add_action('woocommerce_store_api_cart_items_updated', [$this->cart_service, 'apply_cart_discount']);
         add_action('woocommerce_store_api_checkout_update_order_meta', [$this->cart_service, 'apply_cart_discount']);
 
@@ -141,6 +160,9 @@ class Plugin
         add_filter('woocommerce_package_rates', [$this->cart_service, 'remove_free_shipping_when_discount_applied'], 10, 2);
         add_filter('woocommerce_coupon_is_valid', [$this->coupon_service, 'validate_coupon'], 10, 2);
         add_filter('woocommerce_coupon_error', [$this->coupon_service, 'modify_error_message'], 10, 3);
+
+        // Debug log action
+        add_action('nop_log_event', [$this->logger, 'log_event'], 10, 2);
     }
 }
 
@@ -151,8 +173,16 @@ class Plugin
  *
  * @since 1.0.0
  */
-add_action('plugins_loaded', function () {
+add_action('plugins_loaded', function (): void {
     if (class_exists('WooCommerce')) {
-        Plugin::getInstance();
+        NOP_Plugin::get_instance();
+    } else {
+        add_action('admin_notices', function (): void {
+            ?>
+            <div class="error">
+                <p><?php _e('Next Order Plus requires WooCommerce to be installed and activated!', 'next-order-plus'); ?></p>
+            </div>
+            <?php
+        });
     }
 });

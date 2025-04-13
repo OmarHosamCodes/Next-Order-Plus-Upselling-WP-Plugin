@@ -1,0 +1,62 @@
+/**
+ * Next Order Plus - Main Styles
+ * 
+ * CSS for the Next Order Plus discount display.
+ * Includes styles for both classic and block-based cart/checkout.
+ */
+
+/* Discount fee display styling */
+.wp-block-woocommerce-checkout-order-summary-fee-block, 
+.wc-block-components-totals-fees {
+    color: #EF5A59 !important;
+    font-weight: 500;
+}
+
+/* Classic cart discount styling */
+.cart_totals .cart-discount td {
+    color: #EF5A59;
+}
+
+/* Mini cart discount styling */
+.mini-cart-discount {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+    color: #292929;
+    font-weight: inherit;
+    font-size: initial;
+}
+
+.mini-cart-discount-label {
+    padding-left: 5px;
+}
+
+.mini-cart-discount-amount {
+    color: #EF5A59;
+    padding-right: 5px;
+    font-weight: 500;
+}
+
+/* Cart block discount display */
+.wc-block-components-totals-discount {
+    color: #EF5A59;
+}
+
+/* RTL Support */
+.rtl .mini-cart-discount-label {
+    padding-left: 0;
+    padding-right: 5px;
+}
+
+.rtl .mini-cart-discount-amount {
+    padding-right: 0;
+    padding-left: 5px;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+    .mini-cart-discount {
+        font-size: 0.9em;
+    }
+}

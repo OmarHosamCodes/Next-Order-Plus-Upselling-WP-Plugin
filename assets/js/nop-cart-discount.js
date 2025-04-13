@@ -1,5 +1,5 @@
 /**
- * Cart Discount Handler
+ * Next Order Plus - Cart Discount Handler
  * 
  * Manages automatic discount updates in the WooCommerce cart when cart contents change.
  * Provides compatibility with both Classic Cart and Block-based Cart implementations.
@@ -8,7 +8,15 @@
  * @requires jQuery
  * @requires WooCommerce
  */
-jQuery(document).ready(($) => {
+(function ($) {
+    'use strict';
+
+    // Check if nop_ajax is available (properly localized)
+    if (typeof nop_ajax === 'undefined') {
+        console.error('Next Order Plus: AJAX configuration not found');
+        return;
+    }
+
     /**
      * Debounce function to limit API call frequency
      * 
@@ -42,7 +50,6 @@ jQuery(document).ready(($) => {
      * Updates discount display and triggers cart refresh when needed.
      * 
      * @fires updated_cart_totals On classic cart update
-     * @async
      */
     function updateCartDiscount() {
         if (isPending) {
@@ -52,20 +59,20 @@ jQuery(document).ready(($) => {
         isPending = true;
 
         $.ajax({
-            url: b4gf_ajax.ajax_url,
+            url: nop_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'update_cart_discount',
-                nonce: b4gf_ajax.nonce
+                action: 'update_mini_cart_discount',
+                nonce: nop_ajax.nonce
             },
-            success: (response) => {
+            success: function (response) {
                 if (response.success) {
                     // Only update if discount amount changed
-                    if (response.discount !== getCurrentDiscount()) {
+                    if (response.data.discount !== getCurrentDiscount()) {
                         // Update discount display
-                        if (response.discount > 0) {
+                        if (response.data.discount > 0) {
                             $('.cart-discount').show();
-                            $('.cart-discount-amount').text(response.discount_formatted);
+                            $('.cart-discount-amount').text(response.data.discount_formatted);
                         } else {
                             $('.cart-discount').hide();
                         }
@@ -76,24 +83,24 @@ jQuery(document).ready(($) => {
                             $(document.body).off('updated_cart_totals', debouncedUpdate);
                             $(document.body).trigger('updated_cart_totals');
                             $(document.body).on('updated_cart_totals', debouncedUpdate);
-                        } else if (window.wc?.store?.dispatch) {
+                        } else if (window.wc && window.wc.store && window.wc.store.dispatch) {
                             // Block Cart update
                             window.wc.store.dispatch('wc/cart').invalidateResolutionForStore();
                         }
                     }
                 }
             },
-            error: (xhr, status, error) => {
-                console.error('Cart discount update failed:', {
-                    status: `${xhr.status} ${status}`,
+            error: function (xhr, status, error) {
+                console.error('Next Order Plus: Cart discount update failed:', {
+                    status: xhr.status + ' ' + status,
                     statusText: xhr.statusText,
                     responseText: xhr.responseText,
                     error: error
                 });
-                // Show error message to user
+                // Hide discount display on error
                 $('.cart-discount').hide();
             },
-            complete: () => {
+            complete: function () {
                 isPending = false;
             }
         });
@@ -108,43 +115,42 @@ jQuery(document).ready(($) => {
      */
     function getCurrentDiscount() {
         const discountElement = $('.cart-discount-amount');
-        return discountElement.length ? Number.parseFloat(discountElement.text().replace(/[^0-9.-]+/g, '')) : 0;
+        return discountElement.length ?
+            parseFloat(discountElement.text().replace(/[^0-9.-]+/g, '')) :
+            0;
     }
 
     // Create debounced version of update function (500ms delay)
     const debouncedUpdate = debounce(updateCartDiscount, 500);
 
     /**
-     * Bind cart update event handlers
-     * 
-     * Listens for various cart modification events and triggers discount recalculation
-     * Events handled:
-     * - updated_cart_totals: When cart totals are recalculated
-     * - added_to_cart: When items are added
-     * - removed_from_cart: When items are removed
-     * - wc-blocks-cart-update-cart: When block cart is updated
+     * Initialize cart update listeners
      */
-    const events = [
-        'updated_cart_totals',
-        'added_to_cart',
-        'removed_from_cart',
-        'wc-blocks-cart-update-cart'
-    ];
+    function init() {
+        // Bind cart update event handlers for various cart modification events
+        const events = [
+            'updated_cart_totals',
+            'added_to_cart',
+            'removed_from_cart',
+            'wc-blocks-cart-update-cart'
+        ];
 
-    for (const event of events) {
-        $(document.body).on(event, debouncedUpdate);
+        for (const event of events) {
+            $(document.body).on(event, debouncedUpdate);
+        }
+
+        // Initialize Block Cart listener if available
+        if (window.wc && window.wc.blocksRegistry) {
+            window.wc.blocksRegistry.subscribe('cart', debouncedUpdate);
+        }
+
+        // Initial update if cart is present
+        if ($('.woocommerce-cart-form').length || $('.wp-block-woocommerce-cart').length) {
+            debouncedUpdate();
+        }
     }
 
-    /**
-     * Initialize Block Cart listener
-     * Sets up subscription to cart changes in WooCommerce Blocks implementation
-     */
-    if (window.wc?.blocksRegistry) {
-        window.wc.blocksRegistry.subscribe('cart', debouncedUpdate);
-    }
+    // Initialize when DOM is ready
+    $(document).ready(init);
 
-    // Initial update if cart is present
-    if ($('.woocommerce-cart-form').length || $('.wp-block-woocommerce-cart').length) {
-        debouncedUpdate();
-    }
-});
+})(jQuery);
