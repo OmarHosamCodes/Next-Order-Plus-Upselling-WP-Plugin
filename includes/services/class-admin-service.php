@@ -384,9 +384,6 @@ class NOP_Admin_Service extends NOP_Base
         // Get plugin options
         $options = $this->get_options();
 
-        // Get statistics
-        $stats = $this->get_discount_statistics();
-
         // Admin page wrapper
         ?>
         <div class="wrap">
@@ -410,25 +407,11 @@ class NOP_Admin_Service extends NOP_Base
                                 <?php esc_html_e('WooCommerce is not active. This promotion requires WooCommerce to function.', 'next-order-plus'); ?>
                             <?php endif; ?>
                         </p>
-
-                        <?php if (!empty($stats)): ?>
-                            <div class="nop-stats-grid">
-                                <div class="nop-stats-card">
-                                    <div class="nop-stats-value"><?php echo esc_html($stats['total_discounts']); ?></div>
-                                    <div class="nop-stats-label"><?php esc_html_e('Discounts Applied', 'next-order-plus'); ?></div>
-                                </div>
-                                <div class="nop-stats-card">
-                                    <div class="nop-stats-value"><?php echo wc_price($stats['total_amount']); ?></div>
-                                    <div class="nop-stats-label"><?php esc_html_e('Total Discount Amount', 'next-order-plus'); ?>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endif; ?>
                     </div>
 
                     <!-- Settings form -->
                     <div class="nop-admin-box">
-                        <h3><?php esc_html_e('Promotion Settings', 'next-order-plus'); ?></h3>
+                        <h3><?php esc_html_e('Settings', 'next-order-plus'); ?></h3>
                         <form method="post" action="options.php">
                             <?php
                             // Output security fields
@@ -487,48 +470,6 @@ class NOP_Admin_Service extends NOP_Base
             </div>
         </div>
         <?php
-    }
-
-    /**
-     * Get statistics about applied discounts
-     *
-     * @return array Discount statistics
-     */
-    private function get_discount_statistics(): array
-    {
-        if (!class_exists('WooCommerce')) {
-            return [];
-        }
-
-        global $wpdb;
-
-        // Get orders with our discount
-        $meta_key = '_' . $this->prefix . 'discount_amount';
-
-        // Get count and sum of discounts
-        $query = $wpdb->prepare(
-            "SELECT 
-                COUNT(DISTINCT post_id) as total_discounts,
-                SUM(meta_value) as total_amount
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key = %s 
-            AND meta_value > 0",
-            $meta_key
-        );
-
-        $results = $wpdb->get_row($query, ARRAY_A);
-
-        if (!$results) {
-            return [
-                'total_discounts' => 0,
-                'total_amount' => 0
-            ];
-        }
-
-        return [
-            'total_discounts' => (int) $results['total_discounts'],
-            'total_amount' => (float) $results['total_amount']
-        ];
     }
 
     /**
