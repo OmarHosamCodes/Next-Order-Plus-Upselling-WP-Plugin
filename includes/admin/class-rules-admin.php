@@ -198,25 +198,28 @@ class NOP_Rules_Admin extends NOP_Base
                             </tr>
                         <?php else: ?>
                             <?php foreach ($rules as $rule): ?>
-                                <tr data-rule-id="<?php echo esc_attr($rule->get_id()); ?>">
-                                    <td><?php echo esc_html($rule->get_priority()); ?></td>
-                                    <td><?php echo esc_html($rule->get_name()); ?></td>
-                                    <td><?php echo esc_html($rule->get_description()); ?></td>
-                                    <td><?php echo esc_html($this->rules_manager->get_condition_label($rule->get_condition_type())); ?></td>
-                                    <td><?php echo esc_html($this->rules_manager->get_action_label($rule->get_action_type())); ?></td>
-                                    <td>
-                                        <div class="nop-status-toggle">
-                                            <label class="nop-switch">
-                                                <input type="checkbox" class="nop-rule-status" <?php checked($rule->is_active(), true); ?>>
-                                                <span class="nop-slider"></span>
-                                            </label>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <button type="button" class="button nop-edit-rule"><?php echo esc_html__('Edit', 'next-order-plus'); ?></button>
-                                        <button type="button" class="button nop-delete-rule"><?php echo esc_html__('Delete', 'next-order-plus'); ?></button>
-                                    </td>
-                                </tr>
+                             <tr data-rule-id="<?php echo esc_attr($rule->get_id()); ?>">
+                                <td><?php echo esc_html($rule->get_priority()); ?></td>
+                                <td><?php echo esc_html($rule->get_name()); ?></td>
+                                <td><?php echo esc_html($rule->get_description()); ?></td>
+                                <td><?php echo esc_html($this->rules_manager->get_condition_label($rule->get_condition_type())); ?></td>
+                                <td><?php echo esc_html($this->rules_manager->get_action_label($rule->get_action_type())); ?></td>
+                                <td>
+                                    <div class="nop-status-toggle">
+                                        <label class="nop-switch">
+                                            <input type="checkbox" class="nop-rule-status" <?php checked($rule->is_active(), true); ?>>
+                                            <span class="nop-slider"></span>
+                                        </label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="hidden" class="nop-rule-data" value='<?php echo esc_attr(wp_json_encode($rule->get_data())); ?>'>
+                                    <button type="button" class="button nop-edit-rule"
+                                        data-rule-id="<?php echo esc_attr($rule->get_id()); ?>"><?php echo esc_html__('Edit', 'next-order-plus'); ?></button>
+                                    <button type="button" class="button nop-delete-rule"
+                                        data-rule-id="<?php echo esc_attr($rule->get_id()); ?>"><?php echo esc_html__('Delete', 'next-order-plus'); ?></button>
+                                </td>
+                            </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
@@ -473,6 +476,7 @@ class NOP_Rules_Admin extends NOP_Base
             ]);
         }
     }
+
     /**
      * AJAX handler for deleting a rule
      *
@@ -480,30 +484,60 @@ class NOP_Rules_Admin extends NOP_Base
      */
     public function ajax_delete_rule(): void
     {
+        // Enable error reporting for debugging
+        ini_set('display_errors', 1);
+        error_reporting(E_ALL);
+
+        // Log the start of the function
+        $this->log('ajax_delete_rule called. POST data: ' . print_r($_POST, true), 'debug');
+
         // Check nonce for security
         if (!check_ajax_referer($this->prefix . 'rules_nonce', 'nonce', false)) {
+            $this->log('Nonce check failed for delete rule', 'error');
             wp_send_json_error(['message' => __('Security check failed.', 'next-order-plus')]);
             return;
         }
 
         // Check permissions
         if (!current_user_can('manage_options')) {
+            $this->log('Permissions check failed for delete rule', 'error');
             wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'next-order-plus')]);
             return;
         }
 
         // Get rule ID
         $rule_id = isset($_POST['rule_id']) ? absint($_POST['rule_id']) : 0;
+
+        // Log the rule ID we're trying to delete
+        $this->log('Attempting to delete rule with ID: ' . $rule_id, 'debug');
+
         if ($rule_id <= 0) {
+            $this->log('Invalid rule ID for deletion: ' . $rule_id, 'error');
             wp_send_json_error(['message' => __('Invalid rule ID.', 'next-order-plus')]);
             return;
         }
 
         // Delete rule
         try {
-            $this->rules_manager->delete_rule($rule_id);
-            $this->log('Rule deleted: ' . $rule_id);
-            
+            // Get the rule first to verify it exists
+            $rule = $this->rules_manager->get_rule($rule_id);
+
+            if (!$rule) {
+                $this->log('Rule not found for deletion: ' . $rule_id, 'error');
+                wp_send_json_error(['message' => __('Rule not found.', 'next-order-plus')]);
+                return;
+            }
+
+            $result = $this->rules_manager->delete_rule($rule_id);
+
+            if (!$result) {
+                $this->log('Failed to delete rule: ' . $rule_id, 'error');
+                wp_send_json_error(['message' => __('Failed to delete rule.', 'next-order-plus')]);
+                return;
+            }
+
+            $this->log('Rule deleted successfully: ' . $rule_id, 'debug');
+
             wp_send_json_success([
                 'message' => __('Rule deleted successfully.', 'next-order-plus')
             ]);

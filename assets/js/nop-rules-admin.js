@@ -39,13 +39,41 @@
         // Add rule button
         $(".nop-add-rule").on("click", openAddRuleModal);
 
-        // Edit rule button
+        // Update the edit rule button click handler
         $rulesTable.on("click", ".nop-edit-rule", function () {
-            const ruleId = $(this).data("rule-id");
-            const ruleData = JSON.parse(
-                $(this).closest("tr").find(".nop-rule-data").val(),
-            );
-            openEditRuleModal(ruleData);
+            try {
+                const ruleId = $(this).data("rule-id");
+                console.log("Edit button clicked for rule ID:", ruleId);
+
+                // Find the hidden rule data input
+                const $ruleDataInput = $(this).closest("tr").find(".nop-rule-data");
+
+                if (!$ruleDataInput.length) {
+                    console.error("Rule data input not found");
+                    showNotice("Error: Rule data not found", "error");
+                    return;
+                }
+
+                const ruleDataValue = $ruleDataInput.val();
+                console.log("Raw rule data:", ruleDataValue);
+
+                // Try to parse the JSON data
+                let ruleData;
+                try {
+                    ruleData = JSON.parse(ruleDataValue);
+                } catch (e) {
+                    console.error("JSON parse error:", e);
+                    console.error("Problematic JSON string:", ruleDataValue);
+                    showNotice("Error parsing rule data. Please refresh the page and try again.", "error");
+                    return;
+                }
+
+                console.log("Parsed rule data:", ruleData);
+                openEditRuleModal(ruleData);
+            } catch (error) {
+                console.error("Error in edit rule handler:", error);
+                showNotice("An unexpected error occurred. Please try again.", "error");
+            }
         });
 
         // Delete rule button
@@ -356,8 +384,8 @@
         return `Product #${productId}`;
     }
     /**
-   * Save rule with correct action prefix
-   */
+     * Save rule with correct action prefix
+     */
     function saveRule(e) {
         e.preventDefault();
 
@@ -367,7 +395,10 @@
         // Check if form exists before accessing [0]
         if (!$ruleForm || $ruleForm.length === 0) {
             console.error("Form not found");
-            showNotice("Form not found. Please reload the page and try again.", "error");
+            showNotice(
+                "Form not found. Please reload the page and try again.",
+                "error",
+            );
             return;
         }
 
@@ -398,24 +429,30 @@
             condition_value: $("#condition_value").val() || "",
             action_value: $("#action_value").val() || "",
             condition_settings: {},
-            action_settings: {}
+            action_settings: {},
         };
 
         console.log("Base rule data:", ruleData);
 
         // Add condition-specific fields
-        console.log("Condition fields found:", $("#condition_fields").find("input, select").length);
+        console.log(
+            "Condition fields found:",
+            $("#condition_fields").find("input, select").length,
+        );
         $("#condition_fields input, #condition_fields select").each(function () {
-            const name = $(this).attr('name');
+            const name = $(this).attr("name");
             const value = $(this).val();
             console.log(`Adding condition field: ${name} = ${value}`);
             ruleData.condition_settings[name] = value;
         });
 
         // Add action-specific fields
-        console.log("Action fields found:", $("#action_fields").find("input, select").length);
+        console.log(
+            "Action fields found:",
+            $("#action_fields").find("input, select").length,
+        );
         $("#action_fields input, #action_fields select").each(function () {
-            const name = $(this).attr('name');
+            const name = $(this).attr("name");
             const value = $(this).val();
             console.log(`Adding action field: ${name} = ${value}`);
             ruleData.action_settings[name] = value;
@@ -444,7 +481,7 @@
         const directPostData = {
             action: `${actionPrefix}save_rule`,
             nonce: nop_rules_data.nonce,
-            rule_data: ruleDataJSON
+            rule_data: ruleDataJSON,
         };
 
         console.log("AJAX request about to be sent with data:", directPostData);
@@ -497,7 +534,7 @@
             },
             complete: () => {
                 console.log("AJAX request completed");
-            }
+            },
         });
     }
     /**
@@ -538,7 +575,7 @@
                 <td>
                     <div class="nop-status-toggle">
                         <label class="nop-switch">
-                            <input type="checkbox" class="nop-rule-status" ${rule.active ? 'checked' : ''}>
+                            <input type="checkbox" class="nop-rule-status" ${rule.active ? "checked" : ""}>
                             <span class="nop-slider"></span>
                         </label>
                     </div>
@@ -577,38 +614,57 @@
 
     // Delete rule
     function deleteRule(ruleId) {
+        // Ensure ruleId is a valid number
+        let internalRuleId = ruleId;
+        if (!internalRuleId || Number.isNaN(Number.parseInt(internalRuleId))) {
+            console.error("Invalid rule ID:", internalRuleId);
+            showNotice(
+                "Invalid rule ID. Please refresh the page and try again.",
+                "error",
+            );
+            return;
+        }
+
+
+        // Convert to integer to ensure it's handled properly
+        internalRuleId = Number.parseInt(internalRuleId);
+        console.log("Deleting rule ID:", internalRuleId);
+
         $.ajax({
             url: nop_rules_data.ajax_url,
             type: "POST",
             data: {
                 action: `${nop_rules_data.prefix}delete_rule`,
                 nonce: nop_rules_data.nonce,
-                rule_id: ruleId,
+                rule_id: internalRuleId,
             },
             beforeSend: () => {
-                $(`tr[data-rule-id="${ruleId}"]`).addClass("nop-deleting");
+                $(`tr[data-rule-id="${internalRuleId}"]`).addClass("nop-deleting");
             },
             success: (response) => {
+                console.log("Delete response:", response);
                 if (response.success) {
-                    $(`tr[data-rule-id="${ruleId}"]`).fadeOut(400, function () {
+                    $(`tr[data-rule-id="${internalRuleId}"]`).fadeOut(400, function () {
                         $(this).remove();
                         showNotice(response.data.message, "success");
                         if ($rulesTable.find("tbody tr").length === 0) {
                             $rulesTable.find("tbody").html(`
-                                <tr>
-                                    <td colspan="7">${nop_rules_data.i18n.no_rules}</td>
-                                </tr>
-                            `);
+                            <tr>
+                                <td colspan="7">${nop_rules_data.i18n.no_rules}</td>
+                            </tr>
+                        `);
                         }
                     });
                 } else {
-                    $(`tr[data-rule-id="${ruleId}"]`).removeClass("nop-deleting");
+                    $(`tr[data-rule-id="${internalRuleId}"]`).removeClass("nop-deleting");
                     showNotice(response.data.message, "error");
                 }
             },
-            error: () => {
-                $(`tr[data-rule-id="${ruleId}"]`).removeClass("nop-deleting");
-                showNotice(nop_rules_data.i18n.error, "error");
+            error: (xhr, status, error) => {
+                console.error("AJAX error:", { xhr, status, error });
+                console.error("Response text:", xhr.responseText);
+                $(`tr[data-rule-id="${internalRuleId}"]`).removeClass("nop-deleting");
+                showNotice(`Error deleting rule: ${error}`, "error");
             },
         });
     }
