@@ -125,10 +125,17 @@ class NOP_Rules_Admin extends NOP_Base
             defined('NOP_VERSION') ? NOP_VERSION : '1.1.0'
         );
 
-        // Localize script data
+        // Get the correct prefix for AJAX actions
+        $ajax_prefix = $this->prefix; // This is coming from NOP_Base class
+
+        // Make sure we're logging the actual prefix
+        error_log('Using AJAX prefix: ' . $ajax_prefix);
+
+        // Localize script data - FIXING THE PREFIX ISSUE
         wp_localize_script($this->prefix . 'rules_admin', $this->prefix . 'rules_data', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce($this->prefix . 'rules_nonce'),
+            'prefix' => $ajax_prefix, // Explicitly set prefix here so it's available in JS
             'condition_types' => $this->rules_manager->get_condition_types(),
             'action_types' => $this->rules_manager->get_action_types(),
             'products' => $this->get_products_for_select(),
@@ -139,6 +146,9 @@ class NOP_Rules_Admin extends NOP_Base
                 'error' => __('An error occurred. Please try again.', 'next-order-plus')
             ]
         ]);
+
+        // Debug output to verify localization
+        error_log('Script localization completed with prefix: ' . $ajax_prefix);
     }
 
     /**
@@ -322,74 +332,147 @@ class NOP_Rules_Admin extends NOP_Base
 
         return $products;
     }
+
     /**
-     * AJAX handler for saving a rule
+     * AJAX handler for saving a rule with extensive debugging
      *
      * @return void
      */
     public function ajax_save_rule(): void
     {
+        // Enable error reporting for debugging
+        ini_set('display_errors', 1);
+        error_reporting(E_ALL);
+
+        // Log the start of the function
+        $this->log('ajax_save_rule called. POST data: ' . print_r($_POST, true), 'debug');
+
         // Check nonce for security
-        if (!check_ajax_referer("{$this->prefix}rules_nonce", 'nonce', false)) {
+        if (!check_ajax_referer($this->prefix . 'rules_nonce', 'nonce', false)) {
+            $this->log('Nonce check failed', 'error');
             wp_send_json_error(['message' => __('Security check failed.', 'next-order-plus')]);
             return;
         }
 
+        $this->log('Nonce check passed', 'debug');
+
         // Check permissions
         if (!current_user_can('manage_options')) {
+            $this->log('Permissions check failed, user cannot manage_options', 'error');
             wp_send_json_error(['message' => __('You do not have permission to perform this action.', 'next-order-plus')]);
             return;
         }
 
+        $this->log('Permission check passed', 'debug');
+
         // Get rule data from request
-        $rule_data = isset($_POST['rule_data']) ? wp_unslash($_POST['rule_data']) : [];
-        if (empty($rule_data)) {
+        $rule_data_raw = isset($_POST['rule_data']) ? $_POST['rule_data'] : '';
+        $this->log('Raw rule data received: ' . $rule_data_raw, 'debug');
+
+        if (empty($rule_data_raw)) {
+            $this->log('No rule data provided in request', 'error');
             wp_send_json_error(['message' => __('No rule data provided.', 'next-order-plus')]);
             return;
         }
 
+        // Decode the JSON data
+        $rule_data = json_decode(wp_unslash($rule_data_raw), true);
+
+        // Check if JSON decoding failed
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->log('JSON decode error: ' . json_last_error_msg(), 'error');
+            wp_send_json_error(['message' => __('Invalid JSON data: ', 'next-order-plus') . json_last_error_msg()]);
+            return;
+        }
+
+        if (!is_array($rule_data)) {
+            $this->log('Decoded rule data is not an array', 'error');
+            wp_send_json_error(['message' => __('Invalid rule data format.', 'next-order-plus')]);
+            return;
+        }
+
+        // Log the decoded data
+        $this->log('Decoded rule data: ' . print_r($rule_data, true), 'debug');
+
         // Create or update rule
         try {
             $rule = new NOP_Rule();
-            $rule_id = isset($rule_data['id']) ? absint($rule_data['id']) : 0;
+            $this->log('New rule object created', 'debug');
+
+            $rule_id = isset($rule_data['id']) && !empty($rule_data['id']) ? absint($rule_data['id']) : 0;
+            $this->log('Rule ID from data: ' . $rule_id, 'debug');
 
             if ($rule_id > 0) {
+                $this->log('Attempting to load existing rule with ID: ' . $rule_id, 'debug');
                 $rule = $this->rules_manager->get_rule($rule_id);
                 if (!$rule) {
+                    $this->log('Rule not found with ID: ' . $rule_id, 'error');
                     throw new \Exception(__('Rule not found.', 'next-order-plus'));
                 }
+                $this->log('Existing rule loaded successfully', 'debug');
             }
 
             // Set rule properties
+            $this->log('Setting rule properties', 'debug');
+
+            // Set basic properties
             $rule->set_name(sanitize_text_field($rule_data['name']));
             $rule->set_description(sanitize_textarea_field($rule_data['description'] ?? ''));
             $rule->set_priority(absint($rule_data['priority'] ?? 10));
+            $rule->set_active(isset($rule_data['active']) ? (bool) $rule_data['active'] : true);
+
+            // Set condition properties
             $rule->set_condition_type(sanitize_text_field($rule_data['condition_type']));
-            $rule->set_condition_data($rule_data['condition_settings'] ?? []);
+            if (isset($rule_data['condition_value'])) {
+                $rule->set_condition_value($rule_data['condition_value']);
+            }
+            if (isset($rule_data['condition_settings']) && is_array($rule_data['condition_settings'])) {
+                $rule->set_condition_params($rule_data['condition_settings']);
+            }
+
+            // Set action properties
             $rule->set_action_type(sanitize_text_field($rule_data['action_type']));
-            $rule->set_action_data($rule_data['action_settings'] ?? []);
-            $rule->set_active(isset($rule_data['active']) ? (bool)$rule_data['active'] : true);
+            if (isset($rule_data['action_value'])) {
+                $rule->set_action_value($rule_data['action_value']);
+            }
+            if (isset($rule_data['action_settings']) && is_array($rule_data['action_settings'])) {
+                $rule->set_action_params($rule_data['action_settings']);
+            }
+
+            $this->log('Rule properties set, dumping rule object: ' . print_r($rule->get_data(), true), 'debug');
 
             // Save rule
+            $this->log('Attempting to save rule', 'debug');
             $saved_id = $this->rules_manager->save_rule($rule);
-            
-            $this->log('Rule saved: ' . $saved_id);
-            
+            $this->log('Rule saved, returned ID: ' . $saved_id, 'debug');
+
+            if (empty($saved_id) || $saved_id === 0) {
+                $this->log('Save operation returned empty or zero ID', 'error');
+                throw new \Exception(__('Failed to generate a valid rule ID.', 'next-order-plus'));
+            }
+
             // Get fresh rule object
             $saved_rule = $this->rules_manager->get_rule($saved_id);
-            
+
+            if (!$saved_rule) {
+                $this->log('Could not retrieve the saved rule with ID: ' . $saved_id, 'error');
+                throw new \Exception(__('Rule was saved but could not be retrieved.', 'next-order-plus'));
+            }
+
+            $rule_data = $saved_rule->get_data();
+            $this->log('Retrieved saved rule data: ' . print_r($rule_data, true), 'debug');
+
             wp_send_json_success([
                 'message' => __('Rule saved successfully.', 'next-order-plus'),
-                'rule' => $saved_rule ? $saved_rule->to_array() : ['id' => $saved_id]
+                'rule' => $rule_data
             ]);
         } catch (\Exception $e) {
-            $this->log('Error saving rule: ' . $e->getMessage(), 'error');
+            $this->log('Exception thrown during rule save: ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString(), 'error');
             wp_send_json_error([
                 'message' => $e->getMessage()
             ]);
         }
     }
-
     /**
      * AJAX handler for deleting a rule
      *

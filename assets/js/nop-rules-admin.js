@@ -355,20 +355,102 @@
         }
         return `Product #${productId}`;
     }
-
-    // Save rule
+    /**
+   * Save rule with correct action prefix
+   */
     function saveRule(e) {
         e.preventDefault();
 
+        // Debug output to console
+        console.log("Form submission started");
+
         // Check if form exists before accessing [0]
         if (!$ruleForm || $ruleForm.length === 0) {
+            console.error("Form not found");
             showNotice("Form not found. Please reload the page and try again.", "error");
             return;
         }
 
-        const formData = new FormData($ruleForm[0]);
-        formData.append("action", `${nop_rules_data.prefix}save_rule`);
+        // Log what prefix we're using
+        console.log("nop_rules_data object:", nop_rules_data);
+        console.log("Prefix value:", nop_rules_data.prefix);
+
+        // IMPORTANT: Hard-code the correct prefix if it's undefined
+        const actionPrefix = nop_rules_data.prefix || "nop_";
+        console.log("Using action prefix:", actionPrefix);
+
+        // Create structured rule data object from form with debugging
+        console.log("Building rule data from form elements");
+        const $form = $ruleForm;
+
+        // Log all form elements to identify what's available
+        console.log("All form elements:", $form.serializeArray());
+
+        // Build rule data object
+        const ruleData = {
+            id: $("#rule_id").val() || "",
+            name: $("#rule_name").val() || "",
+            description: $("#rule_description").val() || "",
+            priority: $("#rule_priority").val() || "10",
+            condition_type: $("#condition_type").val() || "",
+            action_type: $("#action_type").val() || "",
+            active: $("#rule_active").is(":checked"),
+            condition_value: $("#condition_value").val() || "",
+            action_value: $("#action_value").val() || "",
+            condition_settings: {},
+            action_settings: {}
+        };
+
+        console.log("Base rule data:", ruleData);
+
+        // Add condition-specific fields
+        console.log("Condition fields found:", $("#condition_fields").find("input, select").length);
+        $("#condition_fields input, #condition_fields select").each(function () {
+            const name = $(this).attr('name');
+            const value = $(this).val();
+            console.log(`Adding condition field: ${name} = ${value}`);
+            ruleData.condition_settings[name] = value;
+        });
+
+        // Add action-specific fields
+        console.log("Action fields found:", $("#action_fields").find("input, select").length);
+        $("#action_fields input, #action_fields select").each(function () {
+            const name = $(this).attr('name');
+            const value = $(this).val();
+            console.log(`Adding action field: ${name} = ${value}`);
+            ruleData.action_settings[name] = value;
+        });
+
+        // Add exclusive setting
+        ruleData.action_settings.exclusive = $("#action_exclusive").is(":checked");
+        console.log("Exclusive setting:", ruleData.action_settings.exclusive);
+
+        // Debug output complete rule data
+        console.log("Final rule data object:", ruleData);
+
+        // Create form data for AJAX request
+        const formData = new FormData();
+
+        // Use the correct action name - this is the key fix
+        formData.append("action", `${actionPrefix}save_rule`);
         formData.append("nonce", nop_rules_data.nonce);
+
+        // Convert rule data to JSON string
+        const ruleDataJSON = JSON.stringify(ruleData);
+        console.log("Rule data JSON:", ruleDataJSON);
+        formData.append("rule_data", ruleDataJSON);
+
+        // Create a direct object for debugging in the Network tab
+        const directPostData = {
+            action: `${actionPrefix}save_rule`,
+            nonce: nop_rules_data.nonce,
+            rule_data: ruleDataJSON
+        };
+
+        console.log("AJAX request about to be sent with data:", directPostData);
+
+        // Add a timestamp to avoid caching
+        formData.append("_", new Date().getTime());
 
         $.ajax({
             url: nop_rules_data.ajax_url,
@@ -376,31 +458,114 @@
             data: formData,
             processData: false,
             contentType: false,
-            beforeSend: () => {
+            beforeSend: (xhr) => {
+                console.log("AJAX request starting");
                 $ruleForm
                     .find('button[type="submit"]')
                     .prop("disabled", true)
-                    .text(nop_rules_data.i18n.saving);
+                    .text("Saving...");
             },
             success: (response) => {
+                console.log("AJAX response received:", response);
                 if (response.success) {
-                    window.location.href = response.data.redirect;
+                    console.log("Save successful, rule ID:", response.data.rule?.id);
+                    // Show success message
+                    showNotice(response.data.message, "success");
+
+                    // Close modal
+                    closeModal();
+
+                    // Refresh the page to see new rule
+                    window.location.reload();
                 } else {
-                    showNotice(response.data.message, "error");
+                    console.error("Save failed:", response.data.message);
+                    showNotice(response.data.message || "Save failed", "error");
                     $ruleForm
                         .find('button[type="submit"]')
                         .prop("disabled", false)
-                        .text(nop_rules_data.i18n.save_rule);
+                        .text("Save Rule");
                 }
             },
-            error: () => {
-                showNotice(nop_rules_data.i18n.error, "error");
+            error: (xhr, status, error) => {
+                console.error("AJAX error:", { xhr, status, error });
+                console.error("Response text:", xhr.responseText);
+                showNotice(`Error saving rule: ${error}`, "error");
                 $ruleForm
                     .find('button[type="submit"]')
                     .prop("disabled", false)
-                    .text(nop_rules_data.i18n.save_rule);
+                    .text("Save Rule");
             },
+            complete: () => {
+                console.log("AJAX request completed");
+            }
         });
+    }
+    /**
+     * Update a rule in the table without reloading the page
+     */
+    function updateRuleInTable(rule) {
+        const ruleId = rule.id;
+        const $row = $(`tr[data-rule-id="${ruleId}"]`);
+
+        if ($row.length) {
+            // Update existing row
+            $row.find("td:nth-child(1)").text(rule.priority);
+            $row.find("td:nth-child(2)").text(rule.name);
+            $row.find("td:nth-child(3)").text(rule.description);
+            $row.find("td:nth-child(4)").text(getConditionLabel(rule.condition_type));
+            $row.find("td:nth-child(5)").text(getActionLabel(rule.action_type));
+
+            // Update status toggle
+            $row.find(".nop-rule-status").prop("checked", rule.active);
+        } else {
+            // Add new row
+            const $tbody = $rulesTable.find("tbody");
+            const $emptyRow = $tbody.find("tr td[colspan]").parent();
+
+            if ($emptyRow.length) {
+                // Remove "no rules" message
+                $emptyRow.remove();
+            }
+
+            // Create new row HTML
+            const newRow = `
+            <tr data-rule-id="${rule.id}">
+                <td>${rule.priority}</td>
+                <td>${rule.name}</td>
+                <td>${rule.description}</td>
+                <td>${getConditionLabel(rule.condition_type)}</td>
+                <td>${getActionLabel(rule.action_type)}</td>
+                <td>
+                    <div class="nop-status-toggle">
+                        <label class="nop-switch">
+                            <input type="checkbox" class="nop-rule-status" ${rule.active ? 'checked' : ''}>
+                            <span class="nop-slider"></span>
+                        </label>
+                    </div>
+                </td>
+                <td>
+                    <button type="button" class="button nop-edit-rule">${nop_rules_data.i18n.edit}</button>
+                    <button type="button" class="button nop-delete-rule">${nop_rules_data.i18n.delete}</button>
+                </td>
+            </tr>
+        `;
+
+            $tbody.append(newRow);
+        }
+    }
+
+    /**
+     * Get condition label from condition type
+     */
+    function getConditionLabel(type) {
+        return nop_rules_data.condition_types[type] || type;
+    }
+
+    /**
+     * Get action label from action type
+     */
+    function getActionLabel(type) {
+        return nop_rules_data.action_types[type] || type;
     }
 
     // Confirm and delete rule

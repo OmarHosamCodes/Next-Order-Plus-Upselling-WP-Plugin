@@ -20,21 +20,21 @@ class NOP_Rule
      *
      * @var int
      */
-    private $id;
+    private $id = 0;
 
     /**
      * Rule name
      *
      * @var string
      */
-    private $name;
+    private $name = '';
 
     /**
      * Rule description
      *
      * @var string
      */
-    private $description;
+    private $description = '';
 
     /**
      * Rule priority (lower number = higher priority)
@@ -56,7 +56,7 @@ class NOP_Rule
      *
      * @var string
      */
-    private $condition_type;
+    private $condition_type = '';
 
     /**
      * Condition value
@@ -78,7 +78,7 @@ class NOP_Rule
      *
      * @var string
      */
-    private $action_type;
+    private $action_type = '';
 
     /**
      * Action value
@@ -472,24 +472,65 @@ class NOP_Rule
      */
     public function save(): int
     {
+        // Get existing rules
         $rules = get_option('nop_upsell_rules', []);
+
+        // If rules is not an array, initialize as empty array
+        if (!is_array($rules)) {
+            $rules = [];
+        }
+
+        // Log rules for debugging
+        error_log('Current rules before save: ' . print_r($rules, true));
 
         // Generate new ID if not set
         if (empty($this->id)) {
             $max_id = 0;
+
+            // Find the maximum existing ID
             foreach ($rules as $rule) {
-                if ($rule['id'] > $max_id) {
-                    $max_id = $rule['id'];
+                if (is_array($rule) && isset($rule['id']) && (int) $rule['id'] > $max_id) {
+                    $max_id = (int) $rule['id'];
                 }
             }
+
+            // Set new ID
             $this->id = $max_id + 1;
+            error_log('Generated new rule ID: ' . $this->id);
         }
 
-        // Update or add rule
-        $data = $this->get_data();
-        $rules[$this->id] = $data;
+        // Ensure ID is greater than 0
+        if ($this->id <= 0) {
+            $this->id = 1;
+            error_log('Forced rule ID to 1 as it was 0 or negative');
+        }
 
-        update_option('nop_upsell_rules', $rules);
+        // Get rule data
+        $data = $this->get_data();
+        error_log('Rule data to save: ' . print_r($data, true));
+
+        // Make sure ID is set in the data array
+        if (!isset($data['id']) || empty($data['id'])) {
+            $data['id'] = $this->id;
+            error_log('Added ID to data array: ' . $this->id);
+        }
+
+        // Store rule in the array
+        $rules[$this->id] = $data;
+        error_log('Updated rules array: ' . print_r($rules, true));
+
+        // Save option with force update
+        $update_result = update_option('nop_upsell_rules', $rules, false);
+        error_log('Update option result: ' . ($update_result ? 'true' : 'false'));
+
+        // Verify the save worked
+        $saved_rules = get_option('nop_upsell_rules', []);
+        if (!isset($saved_rules[$this->id])) {
+            error_log('ERROR: Rule save verification failed - rule not found in saved data');
+            error_log('Saved rules: ' . print_r($saved_rules, true));
+        } else {
+            error_log('Rule save verification passed - rule found in saved data');
+        }
 
         return $this->id;
     }
