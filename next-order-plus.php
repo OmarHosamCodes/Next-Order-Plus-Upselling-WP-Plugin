@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Next Order Plus
- * Description: Enhanced WooCommerce promotion system. Buy 4 or more products and get the cheapest one free. Compatible with both Classic and Block Cart/Checkout.
- * Version: 1.0.0
+ * Description: Enhanced WooCommerce promotion system with advanced upselling rules. Configure customizable conditions and discounts based on cart contents.
+ * Version: 1.1.0
  * Author: SoM
  * Text Domain: next-order-plus
  * 
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('NOP_VERSION', '1.0.0');
+define('NOP_VERSION', '1.1.0');
 define('NOP_PREFIX', 'nop_');
 define('NOP_DIR', plugin_dir_path(__FILE__));
 define('NOP_URL', plugin_dir_url(__FILE__));
@@ -27,12 +27,19 @@ define('NOP_DEBUG', false); // Set to true for development
 require_once NOP_DIR . 'includes/base/class-base.php';
 require_once NOP_DIR . 'includes/util/class-logger.php';
 
+// Load models
+require_once NOP_DIR . 'includes/models/class-rule.php';
+
 // Load service classes
+require_once NOP_DIR . 'includes/services/class-rules-manager-service.php';
 require_once NOP_DIR . 'includes/services/class-discount-service.php';
 require_once NOP_DIR . 'includes/services/class-assets-service.php';
 require_once NOP_DIR . 'includes/services/class-cart-service.php';
 require_once NOP_DIR . 'includes/services/class-coupon-service.php';
 require_once NOP_DIR . 'includes/services/class-admin-service.php';
+
+// Load admin UI
+require_once NOP_DIR . 'includes/admin/class-rules-admin.php';
 
 /**
  * Main plugin class implementing singleton pattern
@@ -54,18 +61,22 @@ class NOP_Plugin
     /**
      * Service instances
      *
-     * @var NOP\Services\NOP_Discount_Service Handles discount calculations
+     * @var NOP\Services\NOP_Rules_Manager Handles upsell rules management
+     * @var NOP\Services\NOP_Discount_Service Handles legacy discount calculations
      * @var NOP\Services\NOP_Assets_Service Manages frontend assets
      * @var NOP\Services\NOP_Cart_Service Handles cart operations
      * @var NOP\Services\NOP_Coupon_Service Manages coupon validations
      * @var NOP\Services\NOP_Admin_Service Handles admin interface and settings
+     * @var NOP\Admin\NOP_Rules_Admin Handles rules admin UI
      * @var NOP\Util\NOP_Logger Handles debugging and logging
      */
+    private $rules_manager;
     private $discount_service;
     private $assets_service;
     private $cart_service;
     private $coupon_service;
     private $admin_service;
+    private $rules_admin;
     private $logger;
 
     /**
@@ -121,19 +132,30 @@ class NOP_Plugin
             define('NOP_DEBUG_RUNTIME', (bool) $options['debug_mode']);
         }
 
-        // Core services with admin service dependency
+        // Core services
+        $this->rules_manager = new NOP\Services\NOP_Rules_Manager($this->logger);
         $this->discount_service = new NOP\Services\NOP_Discount_Service($this->logger, $this->admin_service);
         $this->assets_service = new NOP\Services\NOP_Assets_Service($this->logger);
-        $this->cart_service = new NOP\Services\NOP_Cart_Service($this->discount_service, $this->logger, $this->admin_service);
+        $this->cart_service = new NOP\Services\NOP_Cart_Service(
+            $this->rules_manager,
+            $this->discount_service,
+            $this->logger,
+            $this->admin_service
+        );
         $this->coupon_service = new NOP\Services\NOP_Coupon_Service($this->logger, $this->admin_service);
+
+        // Admin UI
+        $this->rules_admin = new NOP\Admin\NOP_Rules_Admin($this->rules_manager, $this->logger);
 
         // Initialize all services
         $this->logger->init();
         $this->admin_service->init();
+        $this->rules_manager->init();
         $this->discount_service->init();
         $this->assets_service->init();
         $this->cart_service->init();
         $this->coupon_service->init();
+        $this->rules_admin->init();
     }
 
     /**
@@ -191,6 +213,19 @@ class NOP_Plugin
     public function get_admin_service(): NOP\Services\NOP_Admin_Service
     {
         return $this->admin_service;
+    }
+
+    /**
+     * Get rules manager instance
+     * 
+     * Allows external access to the rules manager
+     * 
+     * @since 1.1.0
+     * @return NOP\Services\NOP_Rules_Manager Rules manager instance
+     */
+    public function get_rules_manager(): NOP\Services\NOP_Rules_Manager
+    {
+        return $this->rules_manager;
     }
 }
 
