@@ -3,7 +3,8 @@
  * Plugin Name: Next Order Plus
  * Description: Enhanced WooCommerce promotion system with advanced upselling rules. Configure customizable conditions and discounts based on cart contents.
  * Version: 1.1.0
- * Author: SoM
+ * Author:      Omar Hosam
+ * Author URI:  school-of-markiting.com
  * Text Domain: next-order-plus
  * 
  * @package NextOrderPlus
