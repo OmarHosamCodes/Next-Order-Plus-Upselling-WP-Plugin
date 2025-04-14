@@ -360,6 +360,12 @@
     function saveRule(e) {
         e.preventDefault();
 
+        // Check if form exists before accessing [0]
+        if (!$ruleForm || $ruleForm.length === 0) {
+            showNotice("Form not found. Please reload the page and try again.", "error");
+            return;
+        }
+
         const formData = new FormData($ruleForm[0]);
         formData.append("action", `${nop_rules_data.prefix}save_rule`);
         formData.append("nonce", nop_rules_data.nonce);

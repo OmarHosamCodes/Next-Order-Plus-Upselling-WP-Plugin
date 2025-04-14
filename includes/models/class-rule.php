@@ -349,6 +349,7 @@ class NOP_Rule
     {
         $this->condition_params = $params;
     }
+
     /**
      * Set condition data (alias for set_condition_params with proper name)
      *
@@ -400,7 +401,6 @@ class NOP_Rule
     {
         return $this->get_data();
     }
-
 
     /**
      * Get action type
