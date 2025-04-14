@@ -135,7 +135,7 @@ class NOP_Rules_Admin extends NOP_Base
         wp_localize_script($this->prefix . 'rules_admin', $this->prefix . 'rules_data', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce($this->prefix . 'rules_nonce'),
-            'prefix' => $ajax_prefix, // Explicitly set prefix here so it's available in JS
+            'prefix' => $ajax_prefix,
             'condition_types' => $this->rules_manager->get_condition_types(),
             'action_types' => $this->rules_manager->get_action_types(),
             'products' => $this->get_products_for_select(),
@@ -143,10 +143,35 @@ class NOP_Rules_Admin extends NOP_Base
                 'confirm_delete' => __('Are you sure you want to delete this rule?', 'next-order-plus'),
                 'save_success' => __('Rule saved successfully.', 'next-order-plus'),
                 'delete_success' => __('Rule deleted successfully.', 'next-order-plus'),
-                'error' => __('An error occurred. Please try again.', 'next-order-plus')
+                'error' => __('An error occurred. Please try again.', 'next-order-plus'),
+                'add_rule' => __('Add Rule', 'next-order-plus'),
+                'edit_rule' => __('Edit Rule', 'next-order-plus'),
+                'select_product' => __('Select a product', 'next-order-plus'),
+                'min_amount' => __('Minimum Cart Amount', 'next-order-plus'),
+                'min_amount_desc' => __('Minimum cart subtotal required', 'next-order-plus'),
+                'min_items' => __('Minimum Items', 'next-order-plus'),
+                'min_items_desc' => __('Minimum number of items required', 'next-order-plus'),
+                'min_spend' => __('Minimum Spend', 'next-order-plus'),
+                'product_total_desc' => __('Total spend on this product', 'next-order-plus'),
+                'discount_percentage' => __('Discount Percentage', 'next-order-plus'),
+                'percentage_discount_desc' => __('Percentage off cart total', 'next-order-plus'),
+                'discount_amount' => __('Discount Amount', 'next-order-plus'),
+                'fixed_discount_desc' => __('Fixed amount off cart total', 'next-order-plus'),
+                'free_shipping_desc' => __('Enables free shipping for eligible methods', 'next-order-plus'),
+                'cheapest_free_desc' => __('Makes the cheapest product in cart free', 'next-order-plus'),
+                'most_expensive_free_desc' => __('Makes the most expensive product in cart free', 'next-order-plus'),
+                'position' => __('Position', 'next-order-plus'),
+                'nth_cheapest_free_desc' => __('Makes the Nth cheapest product in cart free', 'next-order-plus'),
+                'nth_expensive_free_desc' => __('Makes the Nth most expensive product in cart free', 'next-order-plus'),
+                'active' => __('Active', 'next-order-plus'),
+                'inactive' => __('Inactive', 'next-order-plus'),
+                'activate' => __('Activate', 'next-order-plus'),
+                'deactivate' => __('Deactivate', 'next-order-plus'),
+                'edit' => __('Edit', 'next-order-plus'),
+                'delete' => __('Delete', 'next-order-plus'),
+                'no_rules' => __('No rules found. Add your first rule above.', 'next-order-plus')
             ]
         ]);
-
         // Debug output to verify localization
         error_log('Script localization completed with prefix: ' . $ajax_prefix);
     }

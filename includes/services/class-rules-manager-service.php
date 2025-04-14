@@ -64,7 +64,6 @@ class NOP_Rules_Manager extends NOP_Base
             'item_count' => __('Item Count', 'next-order-plus'),
             'specific_product' => __('Specific Product', 'next-order-plus'),
             'product_count' => __('Product Count', 'next-order-plus'),
-            'product_total' => __('Product Total', 'next-order-plus'),
         ];
 
         // Define available action types
@@ -371,10 +370,6 @@ class NOP_Rules_Manager extends NOP_Base
 
             case 'product_count':
                 return $this->check_product_count_condition($condition_value, $condition_params);
-
-            case 'product_total':
-                return $this->check_product_total_condition($condition_value, $condition_params);
-
             default:
                 // Allow custom conditions via filter
                 return apply_filters(
@@ -522,68 +517,6 @@ class NOP_Rules_Manager extends NOP_Base
 
         $this->log("Product count condition: {$product_count} >= {$min_count} for product {$product_id}");
         return $product_count >= $min_count;
-    }
-
-    /**
-     * Check if specific product total meets condition
-     *
-     * @param float $min_total Minimum total
-     * @param array $params Additional parameters with product_id
-     * @return bool Whether condition is met
-     */
-    private function check_product_total_condition(float $min_total, array $params): bool
-    {
-        if (empty($params['product_id'])) {
-            return false;
-        }
-
-        $product_id = $params['product_id'];
-        $product_total = 0;
-        $cart_items = [];
-
-        if (method_exists($this->cart, 'get_cart')) {
-            // Classic Cart
-            $cart_items = $this->cart->get_cart();
-        } elseif (method_exists($this->cart, 'get_items')) {
-            // Block Cart
-            $cart_items = $this->cart->get_items();
-        }
-
-        foreach ($cart_items as $cart_item) {
-            $item_product_id = 0;
-            $quantity = 0;
-            $price = 0;
-
-            if (isset($cart_item['product_id']) && isset($cart_item['quantity'])) {
-                // Classic Cart
-                $item_product_id = $cart_item['product_id'];
-                $quantity = $cart_item['quantity'];
-                if (isset($cart_item['data']) && method_exists($cart_item['data'], 'get_price')) {
-                    $price = $cart_item['data']->get_price();
-                }
-            } elseif (is_object($cart_item)) {
-                // Block Cart
-                if (method_exists($cart_item, 'get_id')) {
-                    $item_product_id = $cart_item->get_id();
-                }
-                if (method_exists($cart_item, 'get_quantity')) {
-                    $quantity = $cart_item->get_quantity();
-                }
-                if (method_exists($cart_item, 'get_product') && $cart_item->get_product()) {
-                    $product = $cart_item->get_product();
-                    if (method_exists($product, 'get_price')) {
-                        $price = $product->get_price();
-                    }
-                }
-            }
-
-            if ($item_product_id == $product_id) {
-                $product_total += $price * $quantity;
-            }
-        }
-
-        $this->log("Product total condition: {$product_total} >= {$min_total} for product {$product_id}");
-        return $product_total >= $min_total;
     }
 
     /**

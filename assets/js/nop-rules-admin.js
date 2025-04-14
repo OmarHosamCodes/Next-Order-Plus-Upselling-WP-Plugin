@@ -64,7 +64,10 @@
                 } catch (e) {
                     console.error("JSON parse error:", e);
                     console.error("Problematic JSON string:", ruleDataValue);
-                    showNotice("Error parsing rule data. Please refresh the page and try again.", "error");
+                    showNotice(
+                        "Error parsing rule data. Please refresh the page and try again.",
+                        "error",
+                    );
                     return;
                 }
 
@@ -176,20 +179,21 @@
             return;
         }
 
+
         let html = "";
 
         switch (conditionType) {
             case "cart_total":
                 html = `
-                    <div class="nop-form-group">
-                        <label for="condition_value">${nop_rules_data.i18n.min_amount}</label>
-                        <div class="nop-input-group">
-                            <span class="nop-input-addon">${nop_rules_data.currency_symbol}</span>
-                            <input type="number" id="condition_value" name="condition_value" step="0.01" min="0" required>
-                        </div>
-                        <p class="description">${nop_rules_data.i18n.min_amount_desc}</p>
+                <div class="nop-form-group">
+                    <label for="condition_value">${nop_rules_data.i18n.min_amount}</label>
+                    <div class="nop-input-group">
+                        <span class="nop-input-addon">${nop_rules_data.currency_symbol || '$'}</span>
+                        <input type="number" id="condition_value" name="condition_value" step="0.01" min="0" required>
                     </div>
-                `;
+                    <p class="description">${nop_rules_data.i18n.min_amount_desc}</p>
+                </div>
+            `;
                 break;
 
             case "item_count":
@@ -213,10 +217,26 @@
                     <div class="nop-form-group">
                         <label for="condition_value">${nop_rules_data.i18n.min_spend}</label>
                         <div class="nop-input-group">
-                            <span class="nop-input-addon">${nop_rules_data.currency_symbol}</span>
+                            <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
                             <input type="number" id="condition_value" name="condition_value" step="0.01" min="0" required>
                         </div>
                         <p class="description">${nop_rules_data.i18n.product_total_desc}</p>
+                    </div>
+                `;
+                break;
+
+            case "product_count":
+                html = `
+                    <div class="nop-form-group"></div>
+                        <label for="product_id">${nop_rules_data.i18n.select_product}</label>
+                        <select id="product_id" name="product_id" class="nop-product-select" required>
+                            <option value="">${nop_rules_data.i18n.select_product}</option>
+                        </select>
+                    </div>
+                    <div class="nop-form-group">
+                        <label for="condition_value">${nop_rules_data.i18n.min_items}</label>
+                        <input type="number" id="condition_value" name="condition_value" min="1" required>
+                        <p class="description">${nop_rules_data.i18n.min_items_desc}</p>
                     </div>
                 `;
                 break;
@@ -262,7 +282,7 @@
                     <div class="nop-form-group">
                         <label for="action_value">${nop_rules_data.i18n.discount_amount}</label>
                         <div class="nop-input-group">
-                            <span class="nop-input-addon">${nop_rules_data.currency_symbol}</span>
+                            <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
                             <input type="number" id="action_value" name="action_value" min="0" step="0.01" required>
                         </div>
                         <p class="description">${nop_rules_data.i18n.fixed_discount_desc}</p>
@@ -349,6 +369,7 @@
                         true,
                         true,
                     );
+
                     $("#product_id").append(productOption).trigger("change");
                 }
                 break;
@@ -595,16 +616,25 @@
      * Get condition label from condition type
      */
     function getConditionLabel(type) {
-        return nop_rules_data.condition_types[type] || type;
+        // First check if it exists in our condition_types object
+        if (nop_rules_data.condition_types?.[type]) {
+            return nop_rules_data.condition_types[type];
+        }
+        // Fallback to type name with improved formatting if label is not found
+        return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
     }
 
     /**
      * Get action label from action type
      */
     function getActionLabel(type) {
-        return nop_rules_data.action_types[type] || type;
+        // First check if it exists in our action_types object
+        if (nop_rules_data.action_types?.[type]) {
+            return nop_rules_data.action_types[type];
+        }
+        // Fallback to type name with improved formatting if label is not found
+        return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
     }
-
     // Confirm and delete rule
     function confirmDeleteRule(ruleId) {
         if (confirm(nop_rules_data.i18n.confirm_delete)) {
@@ -624,7 +654,6 @@
             );
             return;
         }
-
 
         // Convert to integer to ensure it's handled properly
         internalRuleId = Number.parseInt(internalRuleId);
