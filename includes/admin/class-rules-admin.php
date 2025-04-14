@@ -155,7 +155,7 @@ class NOP_Rules_Admin extends NOP_Base
         $rules = $this->rules_manager->get_rules();
 
         ?>
-        <di class="wrap nop-rules-wrap">
+        <div class="wrap nop-rules-wrap">
             <h1><?php echo esc_html__('Upsell Rules', 'next-order-plus'); ?></h1>
             
             <div class="nop-rules-header">
@@ -211,6 +211,86 @@ class NOP_Rules_Admin extends NOP_Base
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+        <div id="nop-rule-modal" class="nop-modal" style="display: none;">
+    <div class="nop-modal-content">
+        <span class="nop-modal-close">&times;</span>
+        <h2 id="nop-modal-title"><?php echo esc_html__('Add Rule', 'next-order-plus'); ?></h2>
+        
+                <form id="nop-rule-form">
+                    <input type="hidden" id="rule_id" name="rule_id" value="">
+        
+                    <div class="nop-form-row">
+                        <div class="nop-form-group">
+                            <label for="rule_name"><?php echo esc_html__('Rule Name', 'next-order-plus'); ?></label>
+                            <input type="text" id="rule_name" name="rule_name" required>
+                        </div>
+        
+                        <div class="nop-form-group">
+                            <label for="rule_priority"><?php echo esc_html__('Priority', 'next-order-plus'); ?></label>
+                            <input type="number" id="rule_priority" name="rule_priority" value="10" min="1">
+                        </div>
+                    </div>
+        
+                    <div class="nop-form-group">
+                        <label for="rule_description"><?php echo esc_html__('Description', 'next-order-plus'); ?></label>
+                        <textarea id="rule_description" name="rule_description"></textarea>
+                    </div>
+        
+                    <div class="nop-form-row">
+                        <div class="nop-form-group">
+                            <label for="condition_type"><?php echo esc_html__('Condition', 'next-order-plus'); ?></label>
+                            <select id="condition_type" name="condition_type" required>
+                                <option value=""><?php echo esc_html__('Select a condition', 'next-order-plus'); ?></option>
+                                <?php foreach ($this->rules_manager->get_condition_types() as $type => $label): ?>
+                                    <option value="<?php echo esc_attr($type); ?>"><?php echo esc_html($label); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+        
+                    <div id="condition_fields">
+                        <!-- Dynamic fields will be added here -->
+                    </div>
+        
+                    <div class="nop-form-row">
+                        <div class="nop-form-group">
+                            <label for="action_type"><?php echo esc_html__('Action', 'next-order-plus'); ?></label>
+                            <select id="action_type" name="action_type" required>
+                                <option value=""><?php echo esc_html__('Select an action', 'next-order-plus'); ?></option>
+                                <?php foreach ($this->rules_manager->get_action_types() as $type => $label): ?>
+                                    <option value="<?php echo esc_attr($type); ?>"><?php echo esc_html($label); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+        
+                    <div id="action_fields">
+                        <!-- Dynamic fields will be added here -->
+                    </div>
+        
+                    <div class="nop-form-group">
+                        <label>
+                            <input type="checkbox" id="action_exclusive" name="action_exclusive">
+                            <?php echo esc_html__('Exclusive (prevents other rules from applying)', 'next-order-plus'); ?>
+                        </label>
+                    </div>
+        
+                    <div class="nop-form-group">
+                        <label>
+                            <input type="checkbox" id="rule_active" name="rule_active" checked>
+                            <?php echo esc_html__('Active', 'next-order-plus'); ?>
+                        </label>
+                    </div>
+        
+                    <div class="nop-form-actions">
+                        <button type="submit"
+                            class="button button-primary"><?php echo esc_html__('Save Rule', 'next-order-plus'); ?></button>
+                        <button type="button"
+                            class="button nop-cancel-rule"><?php echo esc_html__('Cancel', 'next-order-plus'); ?></button>
+                    </div>
+                </form>
             </div>
         </div>
         <?php
