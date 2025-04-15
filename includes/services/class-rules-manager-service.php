@@ -146,6 +146,17 @@ class NOP_Rules_Manager extends NOP_Base
             $this->deactivate_other_category_rules($rule->get_category(), $rule->get_id());
         }
 
+        // If no category is set, use the condition type as the category
+        if (empty($rule->get_category()) && !empty($rule->get_condition_type())) {
+            $rule->set_category($rule->get_condition_type());
+            $this->log('Auto-setting category to condition type: ' . $rule->get_condition_type());
+
+            // If the rule is active, deactivate other rules in different categories
+            if ($rule->is_active()) {
+                $this->deactivate_other_category_rules($rule->get_category(), $rule->get_id());
+            }
+        }
+
         return $rule->save();
     }
 
@@ -222,6 +233,11 @@ class NOP_Rules_Manager extends NOP_Base
 
         // If the rule has a category, deactivate other categories
         if (!empty($rule->get_category())) {
+            $this->deactivate_other_category_rules($rule->get_category(), $rule_id);
+        }
+        // If no category but has a condition type, use it as category
+        else if (!empty($rule->get_condition_type())) {
+            $rule->set_category($rule->get_condition_type());
             $this->deactivate_other_category_rules($rule->get_category(), $rule_id);
         }
 
@@ -898,6 +914,7 @@ class NOP_Rules_Manager extends NOP_Base
         $this->log("Rule '{$rule->get_name()}' applied with action '{$action_type}', discount: {$result['amount']}");
         return $result;
     }
+
     /**
      * Get condition label by type
      *
@@ -906,7 +923,9 @@ class NOP_Rules_Manager extends NOP_Base
      */
     public function get_condition_label(string $type): string
     {
-        return $this->condition_types[$type] ?? $type;
+        return isset($this->condition_types[$type])
+            ? $this->condition_types[$type]
+            : ucfirst(str_replace('_', ' ', $type));
     }
 
     /**
@@ -917,6 +936,8 @@ class NOP_Rules_Manager extends NOP_Base
      */
     public function get_action_label(string $type): string
     {
-        return $this->action_types[$type] ?? $type;
+        return isset($this->action_types[$type])
+            ? $this->action_types[$type]
+            : ucfirst(str_replace('_', ' ', $type));
     }
 }

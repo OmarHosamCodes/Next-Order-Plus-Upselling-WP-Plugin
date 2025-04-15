@@ -47,8 +47,9 @@
         }
 
         const categories = {};
+        const activeCategories = new Set();
 
-        // First pass: collect categories and their rules
+        // First pass: collect categories and their rules and identify active categories
         $rows.each(function () {
             const $row = $(this);
             const $ruleDataInput = $row.find(".nop-rule-data");
@@ -61,6 +62,11 @@
                 const ruleData = JSON.parse($ruleDataInput.val());
                 const category = ruleData.category || "uncategorized";
 
+                // If rule is active, mark its category as active
+                if (ruleData.active) {
+                    activeCategories.add(category);
+                }
+
                 // Add to categories object
                 if (!categories[category]) {
                     categories[category] = [];
@@ -72,8 +78,8 @@
             }
         });
 
-        // Only proceed if we have multiple categories
-        if (Object.keys(categories).length <= 1) {
+        // Only proceed if we have categories
+        if (Object.keys(categories).length === 0) {
             return;
         }
 
@@ -82,20 +88,28 @@
 
         // Add category headers and rows
         for (const [category, rows] of Object.entries(categories)) {
+            const isCategoryActive = activeCategories.has(category);
+
             // Create category header
             const $categoryHeader = $(`
-                <tr class="nop-category-header">
+                <tr class="nop-category-header ${isCategoryActive ? "active" : "inactive"}">
                     <th colspan="7" class="nop-category-name">
-                        ${category === "uncategorized" ? "Uncategorized Rules" : "Category: " + category}
+                        ${category === "uncategorized" ? "Uncategorized Rules" : `Category: ${category}`}
                     </th>
                 </tr>
             `);
 
-            // Append the header and rows
+            // Append the header
             $rulesTable.find("tbody").append($categoryHeader);
-            rows.forEach(($row) => {
+
+            // Append the rows with appropriate styling
+
+            for (const row in $rows) {
+                if (!isCategoryActive) {
+                    $row.addClass("nop-inactive-category");
+                }
                 $rulesTable.find("tbody").append($row);
-            });
+            }
         }
     }
 
@@ -166,7 +180,7 @@
                         if (ruleData.category && ruleData.category !== "uncategorized") {
                             if (
                                 !confirm(
-                                    `Activating this rule will deactivate all rules in other categories. Continue?`,
+                                    "Activating this rule will deactivate all rules in other categories. Continue?",
                                 )
                             ) {
                                 $toggle.prop("checked", !isActive); // Revert the toggle
@@ -247,9 +261,11 @@
             // Create datalist for suggestions if it doesn't exist
             if (!$("#category-suggestions").length) {
                 const $datalist = $("<datalist id='category-suggestions'></datalist>");
-                categories.forEach((category) => {
+
+                for (const category in categories) {
                     $datalist.append(`<option value="${category}">`);
-                });
+                }
+
                 $("body").append($datalist);
                 $("#rule_category").attr("list", "category-suggestions");
             }

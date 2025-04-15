@@ -60,6 +60,31 @@
 	border-top: 1px solid #ddd;
 }
 
+/* Inactive category styling */
+tr.nop-inactive-category {
+	opacity: 0.6;
+	filter: grayscale(50%);
+}
+
+tr.nop-inactive-category:hover {
+	opacity: 0.8;
+}
+
+tr.nop-inactive-category td {
+	background-color: #f9f9f9;
+}
+
+/* Category active state indicator */
+.nop-category-header.active .nop-category-name {
+	border-left: 4px solid #46b450;
+	padding-left: 11px;
+}
+
+.nop-category-header.inactive .nop-category-name {
+	border-left: 4px solid #ccc;
+	padding-left: 11px;
+}
+
 /* Modal styles */
 .nop-modal {
 	position: fixed;
