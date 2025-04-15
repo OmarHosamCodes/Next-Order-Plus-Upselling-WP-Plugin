@@ -37,6 +37,13 @@ class NOP_Rule
     private $description = '';
 
     /**
+     * Rule category
+     * 
+     * @var string
+     */
+    private $category = '';
+
+    /**
      * Rule priority (lower number = higher priority)
      *
      * @var int
@@ -127,6 +134,10 @@ class NOP_Rule
             $this->description = sanitize_textarea_field($data['description']);
         }
 
+        if (isset($data['category'])) {
+            $this->category = sanitize_text_field($data['category']);
+        }
+
         if (isset($data['priority'])) {
             $this->priority = (int) $data['priority'];
         }
@@ -171,6 +182,7 @@ class NOP_Rule
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
+            'category' => $this->category,
             'priority' => $this->priority,
             'active' => $this->active,
             'condition_type' => $this->condition_type,
@@ -243,6 +255,27 @@ class NOP_Rule
     public function set_description(string $description): void
     {
         $this->description = sanitize_textarea_field($description);
+    }
+
+    /**
+     * Get rule category
+     *
+     * @return string Rule category
+     */
+    public function get_category(): string
+    {
+        return $this->category;
+    }
+
+    /**
+     * Set rule category
+     *
+     * @param string $category Rule category
+     * @return void
+     */
+    public function set_category(string $category): void
+    {
+        $this->category = sanitize_text_field($category);
     }
 
     /**

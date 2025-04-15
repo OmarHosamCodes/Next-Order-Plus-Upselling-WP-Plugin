@@ -18,6 +18,9 @@
         // Initialize Select2 for product selection
         initSelect2();
 
+        // Group rules by categories
+        groupRulesByCategory();
+
         // Bind event handlers
         bindEvents();
 
@@ -32,6 +35,68 @@
             placeholder: nop_rules_data.i18n.select_product,
             data: nop_rules_data.products,
         });
+    }
+
+    // Group rules by categories in the table
+    function groupRulesByCategory() {
+        // Get all table rows
+        const $rows = $rulesTable.find("tbody tr");
+
+        if ($rows.length <= 1) {
+            return; // No need to group if 0 or 1 row
+        }
+
+        const categories = {};
+
+        // First pass: collect categories and their rules
+        $rows.each(function () {
+            const $row = $(this);
+            const $ruleDataInput = $row.find(".nop-rule-data");
+
+            if (!$ruleDataInput.length) {
+                return;
+            }
+
+            try {
+                const ruleData = JSON.parse($ruleDataInput.val());
+                const category = ruleData.category || "uncategorized";
+
+                // Add to categories object
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+
+                categories[category].push($row);
+            } catch (e) {
+                console.error("Failed to parse rule data:", e);
+            }
+        });
+
+        // Only proceed if we have multiple categories
+        if (Object.keys(categories).length <= 1) {
+            return;
+        }
+
+        // Remove all rows
+        $rows.detach();
+
+        // Add category headers and rows
+        for (const [category, rows] of Object.entries(categories)) {
+            // Create category header
+            const $categoryHeader = $(`
+                <tr class="nop-category-header">
+                    <th colspan="7" class="nop-category-name">
+                        ${category === "uncategorized" ? "Uncategorized Rules" : "Category: " + category}
+                    </th>
+                </tr>
+            `);
+
+            // Append the header and rows
+            $rulesTable.find("tbody").append($categoryHeader);
+            rows.forEach(($row) => {
+                $rulesTable.find("tbody").append($row);
+            });
+        }
     }
 
     // Bind event handlers
@@ -86,9 +151,34 @@
         });
 
         // Toggle rule active state
-        $rulesTable.on("click", ".nop-toggle-rule", function () {
-            const ruleId = $(this).data("rule-id");
-            const isActive = $(this).data("active") === 1;
+        $rulesTable.on("click", ".nop-rule-status", function () {
+            const $toggle = $(this);
+            const $row = $toggle.closest("tr");
+            const ruleId = $row.data("rule-id");
+            const isActive = $toggle.prop("checked");
+
+            // If activating a rule, read the category to warn about deactivating other categories
+            if (isActive) {
+                try {
+                    const $ruleDataInput = $row.find(".nop-rule-data");
+                    if ($ruleDataInput.length) {
+                        const ruleData = JSON.parse($ruleDataInput.val());
+                        if (ruleData.category && ruleData.category !== "uncategorized") {
+                            if (
+                                !confirm(
+                                    `Activating this rule will deactivate all rules in other categories. Continue?`,
+                                )
+                            ) {
+                                $toggle.prop("checked", !isActive); // Revert the toggle
+                                return;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error parsing rule data:", e);
+                }
+            }
+
             toggleRuleActive(ruleId, isActive);
         });
 
@@ -104,10 +194,64 @@
         // Action type change
         $("#action_type").on("change", updateActionFields);
 
+        // Rule category change - automatically set the appropriate condition
+        $("#rule_category").on("change", function () {
+            const category = $(this).val();
+            if (category) {
+                // Map categories to condition types
+                switch (category) {
+                    case "cart_total":
+                        $("#condition_type").val("cart_total").trigger("change");
+                        break;
+                    case "item_count":
+                        $("#condition_type").val("item_count").trigger("change");
+                        break;
+                    case "specific_product":
+                        $("#condition_type").val("specific_product").trigger("change");
+                        break;
+                    case "product_count":
+                        $("#condition_type").val("product_count").trigger("change");
+                        break;
+                    case "custom":
+                        // For custom category, don't auto-select any condition
+                        break;
+                }
+            }
+        });
+
         // Close modal when clicking outside of content
         $(window).on("click", (event) => {
             if ($(event.target).is($modal)) {
                 closeModal();
+            }
+        });
+
+        // Category field suggestions
+        $("#rule_category").on("focus", () => {
+            // Get current categories in the table
+            const categories = new Set();
+            $rulesTable.find("tbody tr").each(function () {
+                const $ruleDataInput = $(this).find(".nop-rule-data");
+                if ($ruleDataInput.length) {
+                    try {
+                        const ruleData = JSON.parse($ruleDataInput.val());
+                        if (ruleData.category && ruleData.category !== "uncategorized") {
+                            categories.add(ruleData.category);
+                        }
+                    } catch (e) {
+                        console.error("Error parsing rule data:", e);
+                    }
+                }
+            });
+
+            // Create datalist for suggestions if it doesn't exist
+            if (!$("#category-suggestions").length) {
+                const $datalist = $("<datalist id='category-suggestions'></datalist>");
+                categories.forEach((category) => {
+                    $datalist.append(`<option value="${category}">`);
+                });
+                $("body").append($datalist);
+                $("#rule_category").attr("list", "category-suggestions");
             }
         });
     }
@@ -139,6 +283,9 @@
         $("#rule_priority").val(ruleData.priority);
         $("#rule_active").prop("checked", ruleData.active);
 
+        // Set category (new field)
+        $("#rule_category").val(ruleData.category || "");
+
         // Set condition type and update fields
         $("#condition_type").val(ruleData.condition_type).trigger("change");
 
@@ -161,6 +308,7 @@
     function resetForm() {
         $ruleForm[0].reset();
         $("#rule_id").val("");
+        $("#rule_category").val("");
         $conditionFields.empty();
         $actionFields.empty();
     }
@@ -179,7 +327,6 @@
             return;
         }
 
-
         let html = "";
 
         switch (conditionType) {
@@ -188,7 +335,7 @@
                 <div class="nop-form-group">
                     <label for="condition_value">${nop_rules_data.i18n.min_amount}</label>
                     <div class="nop-input-group">
-                        <span class="nop-input-addon">${nop_rules_data.currency_symbol || '$'}</span>
+                        <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
                         <input type="number" id="condition_value" name="condition_value" step="0.01" min="0" required>
                     </div>
                     <p class="description">${nop_rules_data.i18n.min_amount_desc}</p>
@@ -443,6 +590,7 @@
             id: $("#rule_id").val() || "",
             name: $("#rule_name").val() || "",
             description: $("#rule_description").val() || "",
+            category: $("#rule_category").val() || "",
             priority: $("#rule_priority").val() || "10",
             condition_type: $("#condition_type").val() || "",
             action_type: $("#action_type").val() || "",
@@ -707,52 +855,51 @@
                 action: `${nop_rules_data.prefix}toggle_rule`,
                 nonce: nop_rules_data.nonce,
                 rule_id: ruleId,
+                active: isActive ? 1 : 0,
             },
             beforeSend: () => {
-                $(`tr[data-rule-id="${ruleId}"] .nop-toggle-rule`).prop(
-                    "disabled",
-                    true,
-                );
+                const $row = $(`tr[data-rule-id="${ruleId}"]`);
+                const $checkbox = $row.find(".nop-rule-status");
+                // Disable the checkbox during the request
+                $checkbox.prop("disabled", true);
             },
             success: (response) => {
                 if (response.success) {
-                    const $row = $(`tr[data-rule-id="${ruleId}"]`);
-                    const $statusCell = $row.find(".nop-rule-status");
-                    const $toggleBtn = $row.find(".nop-toggle-rule");
-
-                    // Update status cell
-                    $statusCell
-                        .removeClass("active inactive")
-                        .addClass(response.data.active ? "active" : "inactive");
-                    $statusCell.text(
-                        response.data.active
-                            ? nop_rules_data.i18n.active
-                            : nop_rules_data.i18n.inactive,
-                    );
-
-                    // Update button
-                    $toggleBtn.text(
-                        response.data.active
-                            ? nop_rules_data.i18n.deactivate
-                            : nop_rules_data.i18n.activate,
-                    );
-                    $toggleBtn.data("active", response.data.active ? 1 : 0);
-
                     showNotice(response.data.message, "success");
+
+                    // When activating a rule with a category, it might deactivate other categories
+                    // so we need to refresh the page
+                    if (isActive) {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    }
                 } else {
-                    showNotice(response.data.message, "error");
+                    showNotice(
+                        response.data.message || "Error updating rule status",
+                        "error",
+                    );
+                    // Revert checkbox state
+                    const $checkbox = $(`tr[data-rule-id="${ruleId}"]`).find(
+                        ".nop-rule-status",
+                    );
+                    $checkbox.prop("checked", !isActive);
                 }
-                $(`tr[data-rule-id="${ruleId}"] .nop-toggle-rule`).prop(
-                    "disabled",
-                    false,
-                );
+
+                // Re-enable the checkbox
+                $(`tr[data-rule-id="${ruleId}"]`)
+                    .find(".nop-rule-status")
+                    .prop("disabled", false);
             },
-            error: () => {
-                showNotice(nop_rules_data.i18n.error, "error");
-                $(`tr[data-rule-id="${ruleId}"] .nop-toggle-rule`).prop(
-                    "disabled",
-                    false,
+            error: (xhr, status, error) => {
+                console.error("AJAX error:", { xhr, status, error });
+                showNotice(`Error toggling rule: ${error}`, "error");
+
+                // Revert checkbox state
+                const $checkbox = $(`tr[data-rule-id="${ruleId}"]`).find(
+                    ".nop-rule-status",
                 );
+                $checkbox.prop("checked", !isActive).prop("disabled", false);
             },
         });
     }

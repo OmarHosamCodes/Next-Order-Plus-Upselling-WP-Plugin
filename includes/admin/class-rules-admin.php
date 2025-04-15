@@ -192,17 +192,18 @@ class NOP_Rules_Admin extends NOP_Base
         ?>
         <div class="wrap nop-rules-wrap">
             <h1><?php echo esc_html__('Upsell Rules', 'next-order-plus'); ?></h1>
-            
+
             <div class="nop-rules-header">
-                <p><?php echo esc_html__('Create and manage upsell rules for your store. Rules are evaluated in priority order (lower number = higher priority).', 'next-order-plus'); ?></p>
-                
+                <p><?php echo esc_html__('Create and manage upsell rules for your store. Rules are evaluated in priority order (lower number = higher priority).', 'next-order-plus'); ?>
+                </p>
+
                 <button type="button" class="button button-primary nop-add-rule">
                     <?php echo esc_html__('Add New Rule', 'next-order-plus'); ?>
                 </button>
             </div>
-            
+
             <div class="nop-rules-notice hidden"></div>
-            
+
             <div class="nop-rules-table-container">
                 <table class="wp-list-table widefat fixed striped nop-rules-table">
                     <thead>
@@ -219,32 +220,35 @@ class NOP_Rules_Admin extends NOP_Base
                     <tbody>
                         <?php if (empty($rules)): ?>
                             <tr>
-                                <td colspan="7"><?php echo esc_html__('No rules found. Add your first rule above.', 'next-order-plus'); ?></td>
+                                <td colspan="7">
+                                    <?php echo esc_html__('No rules found. Add your first rule above.', 'next-order-plus'); ?></td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($rules as $rule): ?>
-                             <tr data-rule-id="<?php echo esc_attr($rule->get_id()); ?>">
-                                <td><?php echo esc_html($rule->get_priority()); ?></td>
-                                <td><?php echo esc_html($rule->get_name()); ?></td>
-                                <td><?php echo esc_html($rule->get_description()); ?></td>
-                                <td><?php echo esc_html($this->rules_manager->get_condition_label($rule->get_condition_type())); ?></td>
-                                <td><?php echo esc_html($this->rules_manager->get_action_label($rule->get_action_type())); ?></td>
-                                <td>
-                                    <div class="nop-status-toggle">
-                                        <label class="nop-switch">
-                                            <input type="checkbox" class="nop-rule-status" <?php checked($rule->is_active(), true); ?>>
-                                            <span class="nop-slider"></span>
-                                        </label>
-                                    </div>
-                                </td>
-                                <td>
-                                    <input type="hidden" class="nop-rule-data" value='<?php echo esc_attr(wp_json_encode($rule->get_data())); ?>'>
-                                    <button type="button" class="button nop-edit-rule"
-                                        data-rule-id="<?php echo esc_attr($rule->get_id()); ?>"><?php echo esc_html__('Edit', 'next-order-plus'); ?></button>
-                                    <button type="button" class="button nop-delete-rule"
-                                        data-rule-id="<?php echo esc_attr($rule->get_id()); ?>"><?php echo esc_html__('Delete', 'next-order-plus'); ?></button>
-                                </td>
-                            </tr>
+                                <tr data-rule-id="<?php echo esc_attr($rule->get_id()); ?>">
+                                    <td><?php echo esc_html($rule->get_priority()); ?></td>
+                                    <td><?php echo esc_html($rule->get_name()); ?></td>
+                                    <td><?php echo esc_html($rule->get_description()); ?></td>
+                                    <td><?php echo esc_html($this->rules_manager->get_condition_label($rule->get_condition_type())); ?>
+                                    </td>
+                                    <td><?php echo esc_html($this->rules_manager->get_action_label($rule->get_action_type())); ?></td>
+                                    <td>
+                                        <div class="nop-status-toggle">
+                                            <label class="nop-switch">
+                                                <input type="checkbox" class="nop-rule-status" <?php checked($rule->is_active(), true); ?>>
+                                                <span class="nop-slider"></span>
+                                            </label>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="hidden" class="nop-rule-data"
+                                            value='<?php echo esc_attr(wp_json_encode($rule->get_data())); ?>'>
+                                        <button type="button" class="button nop-edit-rule"
+                                            data-rule-id="<?php echo esc_attr($rule->get_id()); ?>"><?php echo esc_html__('Edit', 'next-order-plus'); ?></button>
+                                        <button type="button" class="button nop-delete-rule"
+                                            data-rule-id="<?php echo esc_attr($rule->get_id()); ?>"><?php echo esc_html__('Delete', 'next-order-plus'); ?></button>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
@@ -252,30 +256,57 @@ class NOP_Rules_Admin extends NOP_Base
             </div>
         </div>
         <div id="nop-rule-modal" class="nop-modal" style="display: none;">
-    <div class="nop-modal-content">
-        <span class="nop-modal-close">&times;</span>
-        <h2 id="nop-modal-title"><?php echo esc_html__('Add Rule', 'next-order-plus'); ?></h2>
-        
+            <div class="nop-modal-content">
+                <span class="nop-modal-close">&times;</span>
+                <h2 id="nop-modal-title"><?php echo esc_html__('Add Rule', 'next-order-plus'); ?></h2>
+
                 <form id="nop-rule-form">
                     <input type="hidden" id="rule_id" name="rule_id" value="">
-        
+
                     <div class="nop-form-row">
                         <div class="nop-form-group">
                             <label for="rule_name"><?php echo esc_html__('Rule Name', 'next-order-plus'); ?></label>
                             <input type="text" id="rule_name" name="rule_name" required>
                         </div>
-        
+
                         <div class="nop-form-group">
                             <label for="rule_priority"><?php echo esc_html__('Priority', 'next-order-plus'); ?></label>
                             <input type="number" id="rule_priority" name="rule_priority" value="10" min="1">
                         </div>
                     </div>
-        
+
+                    <div class="nop-form-row">
+                        <div class="nop-form-group">
+                            <label for="rule_category"><?php echo esc_html__('Rule Category', 'next-order-plus'); ?></label>
+                            <select id="rule_category" name="rule_category" required>
+                                <option value=""><?php echo esc_html__('Select a category', 'next-order-plus'); ?></option>
+                                <option value="cart_total"><?php echo esc_html__('Cart Total', 'next-order-plus'); ?></option>
+                                <option value="item_count"><?php echo esc_html__('Item Count', 'next-order-plus'); ?></option>
+                                <option value="specific_product"><?php echo esc_html__('Specific Product', 'next-order-plus'); ?></option>
+                                <option value="product_count"><?php echo esc_html__('Product Count', 'next-order-plus'); ?></option>
+                                <option value="custom"><?php echo esc_html__('Custom', 'next-order-plus'); ?></option>
+                            </select>
+                            <p class="description">
+                                <?php echo esc_html__('Only one category can be active at a time. Rules in the same category can be active simultaneously.', 'next-order-plus'); ?>
+                            </p>
+                        </div>
+
+                        <div class="nop-form-group">
+                            <label>
+                                <input type="checkbox" id="rule_active" name="rule_active" checked>
+                                <?php echo esc_html__('Active', 'next-order-plus'); ?>
+                            </label>
+                            <p class="description">
+                                <?php echo esc_html__('Activating this rule will deactivate all rules in other categories.', 'next-order-plus'); ?>
+                            </p>
+                        </div>
+                    </div>
+
                     <div class="nop-form-group">
                         <label for="rule_description"><?php echo esc_html__('Description', 'next-order-plus'); ?></label>
                         <textarea id="rule_description" name="rule_description"></textarea>
                     </div>
-        
+
                     <div class="nop-form-row">
                         <div class="nop-form-group">
                             <label for="condition_type"><?php echo esc_html__('Condition', 'next-order-plus'); ?></label>
@@ -287,11 +318,11 @@ class NOP_Rules_Admin extends NOP_Base
                             </select>
                         </div>
                     </div>
-        
+
                     <div id="condition_fields">
                         <!-- Dynamic fields will be added here -->
                     </div>
-        
+
                     <div class="nop-form-row">
                         <div class="nop-form-group">
                             <label for="action_type"><?php echo esc_html__('Action', 'next-order-plus'); ?></label>
@@ -303,25 +334,18 @@ class NOP_Rules_Admin extends NOP_Base
                             </select>
                         </div>
                     </div>
-        
+
                     <div id="action_fields">
                         <!-- Dynamic fields will be added here -->
                     </div>
-        
+
                     <div class="nop-form-group">
                         <label>
                             <input type="checkbox" id="action_exclusive" name="action_exclusive">
                             <?php echo esc_html__('Exclusive (prevents other rules from applying)', 'next-order-plus'); ?>
                         </label>
                     </div>
-        
-                    <div class="nop-form-group">
-                        <label>
-                            <input type="checkbox" id="rule_active" name="rule_active" checked>
-                            <?php echo esc_html__('Active', 'next-order-plus'); ?>
-                        </label>
-                    </div>
-        
+
                     <div class="nop-form-actions">
                         <button type="submit"
                             class="button button-primary"><?php echo esc_html__('Save Rule', 'next-order-plus'); ?></button>
@@ -595,7 +619,7 @@ class NOP_Rules_Admin extends NOP_Base
 
         // Get rule ID and status
         $rule_id = isset($_POST['rule_id']) ? absint($_POST['rule_id']) : 0;
-        $active = isset($_POST['active']) ? (bool)$_POST['active'] : false;
+        $active = isset($_POST['active']) ? (bool) $_POST['active'] : false;
 
         if ($rule_id <= 0) {
             wp_send_json_error(['message' => __('Invalid rule ID.', 'next-order-plus')]);
@@ -611,12 +635,12 @@ class NOP_Rules_Admin extends NOP_Base
 
             $rule->set_active($active);
             $this->rules_manager->save_rule($rule);
-            
+
             $this->log('Rule status updated: ' . $rule_id . ' - ' . ($active ? 'active' : 'inactive'));
-            
+
             wp_send_json_success([
-                'message' => $active 
-                    ? __('Rule activated successfully.', 'next-order-plus') 
+                'message' => $active
+                    ? __('Rule activated successfully.', 'next-order-plus')
                     : __('Rule deactivated successfully.', 'next-order-plus')
             ]);
         } catch (\Exception $e) {
@@ -627,4 +651,3 @@ class NOP_Rules_Admin extends NOP_Base
         }
     }
 }
-                                    

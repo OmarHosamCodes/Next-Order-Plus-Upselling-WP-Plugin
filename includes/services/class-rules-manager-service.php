@@ -141,22 +141,141 @@ class NOP_Rules_Manager extends NOP_Base
      */
     public function save_rule(NOP_Rule $rule): int
     {
+        // If the rule is active and has a category, deactivate other rules in different categories
+        if ($rule->is_active() && !empty($rule->get_category())) {
+            $this->deactivate_other_category_rules($rule->get_category(), $rule->get_id());
+        }
+
         return $rule->save();
     }
 
     /**
-     * Delete a rule from database
+     * Delete a rule by ID
      *
-     * @param int $id Rule ID
+     * @param int $rule_id The ID of the rule to delete
+     * @return bool True on success, false on failure
+     */
+    public function delete_rule(int $rule_id): bool
+    {
+        if ($rule_id <= 0) {
+            return false;
+        }
+
+        try {
+            global $wpdb;
+            $table_name = $wpdb->prefix . $this->prefix . 'rules';
+            $result = $wpdb->delete(
+                $table_name,
+                ['id' => $rule_id],
+                ['%d']
+            );
+
+            return $result !== false;
+        } catch (\Exception $e) {
+            $this->log('Error deleting rule: ' . $e->getMessage(), 'error');
+            return false;
+        }
+    }
+
+    /**
+     * Deactivate rules from other categories
+     *
+     * @param string $active_category The category that should remain active
+     * @param int $except_rule_id The rule ID to exclude from deactivation
+     * @return void
+     */
+    private function deactivate_other_category_rules(string $active_category, int $except_rule_id = 0): void
+    {
+        $rules = $this->get_rules(false); // Get all rules including inactive ones
+
+        foreach ($rules as $rule_id => $rule) {
+            // Skip the rule that triggered this change and rules in the active category
+            if ((int) $rule_id === $except_rule_id || $rule->get_category() === $active_category) {
+                continue;
+            }
+
+            // Only update if the rule is active
+            if ($rule->is_active()) {
+                $rule->set_active(false);
+                $rule->save();
+                $this->log("Deactivated rule #{$rule_id} because rule #{$except_rule_id} in category '{$active_category}' was activated");
+            }
+        }
+    }
+
+    /**
+     * Activate a rule and deactivate other category rules
+     *
+     * @param int $rule_id The rule ID to activate
      * @return bool Success
      */
-    public function delete_rule(int $id): bool
+    public function activate_rule(int $rule_id): bool
     {
-        $rule = new NOP_Rule();
-        if ($rule->load($id)) {
-            return $rule->delete();
+        $rule = $this->get_rule($rule_id);
+
+        if (!$rule) {
+            return false;
         }
-        return false;
+
+        // Set the rule to active
+        $rule->set_active(true);
+
+        // If the rule has a category, deactivate other categories
+        if (!empty($rule->get_category())) {
+            $this->deactivate_other_category_rules($rule->get_category(), $rule_id);
+        }
+
+        // Save the rule
+        $rule->save();
+        $this->log("Activated rule #{$rule_id}");
+
+        return true;
+    }
+
+    /**
+     * Toggle a rule's active state
+     * 
+     * @param int $rule_id The rule ID to toggle
+     * @return bool New active state or false on failure
+     */
+    public function toggle_rule(int $rule_id): bool
+    {
+        $rule = $this->get_rule($rule_id);
+
+        if (!$rule) {
+            return false;
+        }
+
+        if ($rule->is_active()) {
+            // If rule is currently active, just deactivate it
+            $rule->set_active(false);
+            $rule->save();
+            $this->log("Deactivated rule #{$rule_id}");
+            return false;
+        } else {
+            // If rule is being activated, use the activate_rule method
+            return $this->activate_rule($rule_id);
+        }
+    }
+
+    /**
+     * Get all unique rule categories
+     * 
+     * @return array List of unique categories
+     */
+    public function get_categories(): array
+    {
+        $rules = $this->get_rules(false);
+        $categories = [];
+
+        foreach ($rules as $rule) {
+            $category = $rule->get_category();
+            if (!empty($category) && !in_array($category, $categories)) {
+                $categories[] = $category;
+            }
+        }
+
+        return $categories;
     }
 
     /**
