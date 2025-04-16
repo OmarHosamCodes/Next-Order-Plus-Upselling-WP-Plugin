@@ -16,6 +16,9 @@
     const $progressSegments = $(".nop-progress-segment");
     const $activeCategory = $("#nop-active-category");
     const $categorySelect = $("#rule_category");
+    // Category management elements
+    let $categoryControls = $(".nop-category-controls");
+    let $categoryFilter = $("#nop-category-filter");
 
     // Initialize the admin UI
     function init() {
@@ -28,8 +31,278 @@
         // Bind event handlers
         bindEvents();
 
+        // Initialize category selection
+        initCategoryControls();
+
         // Check for URL parameters
         checkUrlParams();
+    }
+
+    // Initialize category controls outside the modal
+    function initCategoryControls() {
+        // Create category selection controls if they don't exist
+        if ($categoryControls.length === 0) {
+            const $controlsHTML = $(`
+                <div class="nop-category-controls">
+                    <h2>${nop_rules_data.i18n.active_category || "Active Category"}</h2>
+                    <div class="nop-category-selector">
+                        <select id="nop-category-filter">
+                            <option value="">${nop_rules_data.i18n.all_categories || "All Categories"}</option>
+                        </select>
+                        <button type="button" class="button" id="nop-activate-category">${nop_rules_data.i18n.activate || "Activate"}</button>
+                    </div>
+                    <div class="nop-category-indicator"></div>
+                </div>
+            `);
+
+            // Insert after the rules header
+            $controlsHTML.insertAfter($(".nop-rules-header"));
+
+            // Re-cache the elements
+            $categoryControls = $(".nop-category-controls");
+            $categoryFilter = $("#nop-category-filter");
+        }
+
+        // Populate the category dropdown from existing rules
+        populateCategoryDropdown();
+    }
+
+    // Populate category dropdown from existing rules
+    function populateCategoryDropdown() {
+        const categories = new Set();
+        let activeCategory = "";
+
+        // Collect categories from rules data
+        $rulesTable.find(".nop-rule-data").each(function () {
+            try {
+                const ruleData = JSON.parse($(this).val());
+                if (ruleData.category) {
+                    categories.add(ruleData.category);
+
+                    // Check if this category is active
+                    if (ruleData.active) {
+                        activeCategory = ruleData.category;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to parse rule data:", e);
+            }
+        });
+
+        // Clear existing options except the first one
+        $categoryFilter.find("option:not(:first)").remove();
+
+        // Add categories to dropdown
+        for (const category of Array.from(categories).sort()) {
+            const $option = $(`<option value="${category}">${category}</option>`);
+            $categoryFilter.append($option);
+        }
+
+        // Set the active category in the dropdown
+        if (activeCategory) {
+            $categoryFilter.val(activeCategory);
+            highlightActiveCategory(activeCategory);
+        }
+
+        // Bind event to activate category button
+        $("#nop-activate-category")
+            .off("click")
+            .on("click", () => {
+                const selectedCategory = $categoryFilter.val();
+                if (selectedCategory) {
+                    activateCategory(selectedCategory);
+                } else {
+                    showNotice("Please select a category to activate", "error");
+                }
+            });
+    }
+
+    // Activate a selected category
+    function activateCategory(category) {
+        if (!category) return;
+
+        // Find all rules in this category
+        const rulesToActivate = [];
+        const rulesToDeactivate = [];
+
+        $rulesTable.find("tr[data-rule-id]").each(function () {
+            const $row = $(this);
+            const $ruleDataInput = $row.find(".nop-rule-data");
+
+            try {
+                const ruleData = JSON.parse($ruleDataInput.val());
+                const ruleId = $row.data("rule-id");
+
+                if (ruleData.category === category) {
+                    // This rule belongs to the category we're activating
+                    rulesToActivate.push({
+                        id: ruleId,
+                        active: ruleData.active,
+                    });
+                } else if (ruleData.active) {
+                    // This is an active rule in another category
+                    rulesToDeactivate.push({
+                        id: ruleId,
+                        active: true,
+                    });
+                }
+            } catch (e) {
+                console.error("Error parsing rule data:", e);
+            }
+        });
+
+        // Confirm with user if needed
+        if (rulesToDeactivate.length > 0) {
+            if (
+                !confirm(
+                    `Activating category "${category}" will deactivate ${rulesToDeactivate.length} rule(s) in other categories. Continue?`,
+                )
+            ) {
+                return;
+            }
+        }
+
+        // Deactivate rules in other categories
+        let processedCount = 0;
+        let errorCount = 0;
+
+        // Process rules to deactivate
+        for (const rule of rulesToDeactivate) {
+            $.ajax({
+                url: nop_rules_data.ajax_url,
+                type: "POST",
+                data: {
+                    action: `${nop_rules_data.prefix}toggle_rule`,
+                    nonce: nop_rules_data.nonce,
+                    rule_id: rule.id,
+                    active: 0, // Deactivate
+                },
+                success: (response) => {
+                    processedCount++;
+                    if (!response.success) {
+                        errorCount++;
+                    }
+                    checkCompletion();
+                },
+                error: () => {
+                    processedCount++;
+                    errorCount++;
+                    checkCompletion();
+                },
+            });
+        }
+
+        // Process rules to activate
+        for (const rule of rulesToActivate) {
+            // Only send request if the rule needs to be activated
+            if (!rule.active) {
+                $.ajax({
+                    url: nop_rules_data.ajax_url,
+                    type: "POST",
+                    data: {
+                        action: `${nop_rules_data.prefix}toggle_rule`,
+                        nonce: nop_rules_data.nonce,
+                        rule_id: rule.id,
+                        active: 1, // Activate
+                    },
+                    success: (response) => {
+                        processedCount++;
+                        if (!response.success) {
+                            errorCount++;
+                        }
+                        checkCompletion();
+                    },
+                    error: () => {
+                        processedCount++;
+                        errorCount++;
+                        checkCompletion();
+                    },
+                });
+            } else {
+                // Rule is already active, count as processed
+                processedCount++;
+                checkCompletion();
+            }
+        };
+
+        // Show loading indicator
+        showNotice("Updating rules...", "info");
+
+        // Check if all operations are complete
+        function checkCompletion() {
+            const totalOperations =
+                rulesToDeactivate.length +
+                rulesToActivate.filter((r) => !r.active).length;
+
+            if (processedCount >= totalOperations) {
+                // All done
+                if (errorCount > 0) {
+                    showNotice(
+                        `Completed with ${errorCount} errors. Please refresh the page.`,
+                        "error",
+                    );
+                } else {
+                    showNotice(
+                        `Successfully activated category "${category}"`,
+                        "success",
+                    );
+                    // Update UI
+                    highlightActiveCategory(category);
+                    // Reload after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            }
+        }
+    }
+
+    // Highlight the active category in the UI
+    function highlightActiveCategory(category) {
+        if (!category) return;
+
+        // Update dropdown to match
+        $categoryFilter.val(category);
+
+        // Highlight rows in this category, dim others
+        $rulesTable.find("tr[data-rule-id]").each(function () {
+            const $row = $(this);
+            const $ruleDataInput = $row.find(".nop-rule-data");
+
+            try {
+                const ruleData = JSON.parse($ruleDataInput.val());
+
+                if (ruleData.category === category) {
+                    $row.removeClass("nop-inactive-category");
+                } else {
+                    $row.addClass("nop-inactive-category");
+                }
+            } catch (e) {
+                console.error("Error parsing rule data:", e);
+            }
+        });
+
+        // Update category headers
+        $rulesTable.find(".nop-category-header").each(function () {
+            const $header = $(this);
+            const headerCategory = $header
+                .find(".nop-category-name")
+                .text()
+                .replace("Category: ", "");
+
+            if (headerCategory === category) {
+                $header.addClass("active").removeClass("inactive");
+            } else {
+                $header.addClass("inactive").removeClass("active");
+            }
+        });
+
+        // Update the indicator in the admin
+        $(".nop-category-indicator").html(`
+            <div class="nop-active-badge">
+                Active: <strong>${category}</strong>
+            </div>
+        `);
     }
 
     // Initialize Select2 for product dropdowns
@@ -65,6 +338,9 @@
             try {
                 const ruleData = JSON.parse($ruleDataInput.val());
                 const category = ruleData.category || "uncategorized";
+
+                // Add data attribute for category filtering
+                $row.attr("data-category", category);
 
                 // If rule is active, mark its category as active
                 if (ruleData.active) {
@@ -116,7 +392,7 @@
         }
     }
 
-    // Bind event handlers
+    // Modify bindEvents function to add category filtering
     function bindEvents() {
         // Add rule button
         $(".nop-add-rule").on("click", openAddRuleModal);
@@ -272,696 +548,33 @@
                 $("#rule_category").attr("list", "category-suggestions");
             }
         });
-    }
 
-    // Check URL parameters for notifications
-    function checkUrlParams() {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has("updated")) {
-            showNotice(nop_rules_data.i18n.save_success, "success");
-        }
-    }
+        // Category filter dropdown
+        $categoryFilter.on("change", function () {
+            const selectedCategory = $(this).val();
 
-    // Update the progress bar when category changes
-    function updateProgressBar(category) {
-        if (!category) return;
+            if (!selectedCategory) {
+                // Show all rules
+                $rulesTable.find("tr[data-rule-id]").show();
+                $rulesTable.find(".nop-category-header").show();
+            } else {
+                // Hide all rules first
+                $rulesTable.find("tr[data-rule-id]").hide();
+                $rulesTable.find(".nop-category-header").hide();
 
-        // Update highlighted segment
-        $progressSegments.removeClass("active");
-        $(`.nop-progress-segment[data-category="${category}"]`).addClass("active");
-
-        // Update active category label
-        let categoryLabel = category;
-
-        // Find the text label from the dropdown
-        $("#rule_category option").each(function () {
-            if ($(this).val() === category) {
-                categoryLabel = $(this).text();
-                return false;
+                // Show only rules in the selected category
+                $rulesTable.find(`tr[data-category="${selectedCategory}"]`).show();
+                $rulesTable
+                    .find(`.nop-category-header:contains("${selectedCategory}")`)
+                    .show();
             }
-        });
-
-        $activeCategory.text(categoryLabel);
-    }
-
-    // Open modal for adding a new rule
-    function openAddRuleModal() {
-        resetForm();
-        $modalTitle.text(nop_rules_data.i18n.add_rule);
-        $modal.show();
-    }
-
-    // Open modal for editing an existing rule
-    function openEditRuleModal(ruleData) {
-        resetForm();
-        $modalTitle.text(nop_rules_data.i18n.edit_rule);
-
-        // Populate form with rule data
-        $("#rule_id").val(ruleData.id);
-        $("#rule_name").val(ruleData.name);
-        $("#rule_description").val(ruleData.description);
-        $("#rule_priority").val(ruleData.priority);
-        $("#rule_active").prop("checked", ruleData.active);
-
-        // Set category (new field)
-        $("#rule_category").val(ruleData.category || "");
-
-        // Set condition type and update fields
-        $("#condition_type").val(ruleData.condition_type).trigger("change");
-
-        // Set action type and update fields
-        $("#action_type").val(ruleData.action_type).trigger("change");
-
-        // Set exclusive flag
-        $("#action_exclusive").prop("checked", ruleData.action_params.exclusive);
-
-        // Set condition values after fields are generated
-        setTimeout(() => {
-            populateConditionValues(ruleData);
-            populateActionValues(ruleData);
-
-            // Update progress bar
-            updateProgressBar(ruleData.category || ruleData.condition_type);
-        }, 100);
-
-        $modal.show();
-    }
-
-    // Reset form to default state
-    function resetForm() {
-        $ruleForm[0].reset();
-        $("#rule_id").val("");
-        $("#rule_category").val("");
-        $conditionFields.empty();
-        $actionFields.empty();
-    }
-
-    // Close the modal
-    function closeModal() {
-        $modal.hide();
-    }
-
-    // Update condition fields based on selected condition type
-    function updateConditionFields(directCategory) {
-        const conditionType = directCategory || $("#condition_type").val();
-        $conditionFields.empty();
-
-        if (!conditionType) {
-            return;
-        }
-
-        let html = "";
-
-        switch (conditionType) {
-            case "cart_total":
-                html = `
-                <div class="nop-form-group">
-                    <label for="condition_value">${nop_rules_data.i18n.min_amount}</label>
-                    <div class="nop-input-group">
-                        <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
-                        <input type="number" id="condition_value" name="condition_value" step="0.01" min="0" required>
-                    </div>
-                    <p class="description">${nop_rules_data.i18n.min_amount_desc}</p>
-                </div>
-            `;
-                break;
-
-            case "item_count":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="condition_value">${nop_rules_data.i18n.min_items}</label>
-                        <input type="number" id="condition_value" name="condition_value" min="1" required>
-                        <p class="description">${nop_rules_data.i18n.min_items_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "specific_product":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="product_id">${nop_rules_data.i18n.select_product}</label>
-                        <select id="product_id" name="product_id" class="nop-product-select" required>
-                            <option value="">${nop_rules_data.i18n.select_product}</option>
-                        </select>
-                    </div>
-                    <div class="nop-form-group">
-                        <label for="condition_value">${nop_rules_data.i18n.min_spend}</label>
-                        <div class="nop-input-group">
-                            <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
-                            <input type="number" id="condition_value" name="condition_value" step="0.01" min="0" required>
-                        </div>
-                        <p class="description">${nop_rules_data.i18n.product_total_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "product_count":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="product_id">${nop_rules_data.i18n.select_product}</label>
-                        <select id="product_id" name="product_id" class="nop-product-select" required>
-                            <option value="">${nop_rules_data.i18n.select_product}</option>
-                        </select>
-                    </div>
-                    <div class="nop-form-group">
-                        <label for="condition_value">${nop_rules_data.i18n.min_items}</label>
-                        <input type="number" id="condition_value" name="condition_value" min="1" required>
-                        <p class="description">${nop_rules_data.i18n.min_items_desc}</p>
-                    </div>
-                `;
-                break;
-        }
-
-        $conditionFields.html(html);
-
-        // Initialize Select2 for product dropdowns - Fix: use proper selector and ensure products data is loaded
-        if (conditionType === "specific_product" || conditionType === "product_count") {
-            const $productSelect = $conditionFields.find(".nop-product-select");
-
-            // Make sure we detach any existing Select2 instances first
-            if ($productSelect.hasClass("select2-hidden-accessible")) {
-                $productSelect.select2("destroy");
-            }
-
-            // Initialize Select2 with proper data
-            $productSelect.select2({
-                width: "100%",
-                placeholder: nop_rules_data.i18n.select_product,
-                data: nop_rules_data.products || [],
-                dropdownParent: $modal // Fix: attach dropdown to modal to prevent z-index issues
-            });
-        }
-    }
-
-    // Update action fields based on selected action type
-    function updateActionFields() {
-        const actionType = $("#action_type").val();
-        $actionFields.empty();
-
-        if (!actionType) {
-            return;
-        }
-
-        let html = "";
-
-        switch (actionType) {
-            case "percentage_discount":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="action_value">${nop_rules_data.i18n.discount_percentage}</label>
-                        <div class="nop-input-group">
-                            <input type="number" id="action_value" name="action_value" min="0" max="100" step="0.01" required>
-                            <span class="nop-input-addon">%</span>
-                        </div>
-                        <p class="description">${nop_rules_data.i18n.percentage_discount_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "fixed_discount":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="action_value">${nop_rules_data.i18n.discount_amount}</label>
-                        <div class="nop-input-group">
-                            <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
-                            <input type="number" id="action_value" name="action_value" min="0" step="0.01" required>
-                        </div>
-                        <p class="description">${nop_rules_data.i18n.fixed_discount_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "free_shipping":
-                html = `
-                    <div class="nop-form-group">
-                        <p class="description">${nop_rules_data.i18n.free_shipping_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "cheapest_free":
-                html = `
-                    <div class="nop-form-group">
-                        <p class="description">${nop_rules_data.i18n.cheapest_free_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "most_expensive_free":
-                html = `
-                    <div class="nop-form-group">
-                        <p class="description">${nop_rules_data.i18n.most_expensive_free_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "nth_cheapest_free":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="n">${nop_rules_data.i18n.position}</label>
-                        <input type="number" id="n" name="n" min="1" value="1" required>
-                        <p class="description">${nop_rules_data.i18n.nth_cheapest_free_desc}</p>
-                    </div>
-                `;
-                break;
-
-            case "nth_expensive_free":
-                html = `
-                    <div class="nop-form-group">
-                        <label for="n">${nop_rules_data.i18n.position}</label>
-                        <input type="number" id="n" name="n" min="1" value="1" required>
-                        <p class="description">${nop_rules_data.i18n.nth_expensive_free_desc}</p>
-                    </div>
-                `;
-                break;
-        }
-
-        $actionFields.html(html);
-    }
-
-    // Populate condition fields with values from rule data
-    function populateConditionValues(ruleData) {
-        const conditionType = ruleData.condition_type;
-
-        switch (conditionType) {
-            case "cart_total":
-            case "item_count":
-                $("#condition_value").val(ruleData.condition_value);
-                break;
-
-            case "specific_product": {
-                const productOption = new Option(
-                    getProductNameById(ruleData.condition_value),
-                    ruleData.condition_value,
-                    true,
-                    true,
-                );
-                $("#product_id").append(productOption).trigger("change");
-                break;
-            }
-
-            case "product_count":
-            case "product_total":
-                $("#condition_value").val(ruleData.condition_value);
-                if (ruleData.condition_params?.product_id) {
-                    const productOption = new Option(
-                        getProductNameById(ruleData.condition_params.product_id),
-                        ruleData.condition_params.product_id,
-                        true,
-                        true,
-                    );
-
-                    $("#product_id").append(productOption).trigger("change");
-                }
-                break;
-        }
-    }
-
-    // Populate action fields with values from rule data
-    function populateActionValues(ruleData) {
-        const actionType = ruleData.action_type;
-
-        switch (actionType) {
-            case "percentage_discount":
-            case "fixed_discount":
-                $("#action_value").val(ruleData.action_value);
-                break;
-
-            case "nth_cheapest_free":
-            case "nth_expensive_free":
-                if (ruleData.action_params?.n) {
-                    $("#n").val(ruleData.action_params.n);
-                }
-                break;
-        }
-    }
-
-    // Get product name by ID
-    function getProductNameById(productId) {
-        for (const product of nop_rules_data.products) {
-            if (product.id === productId) {
-                return product.text;
-            }
-        }
-        return `Product #${productId}`;
-    }
-    /**
-     * Save rule with correct action prefix
-     */
-    function saveRule(e) {
-        e.preventDefault();
-
-        // Debug output to console
-        console.log("Form submission started");
-
-        // Check if form exists before accessing [0]
-        if (!$ruleForm || $ruleForm.length === 0) {
-            console.error("Form not found");
-            showNotice(
-                "Form not found. Please reload the page and try again.",
-                "error",
-            );
-            return;
-        }
-
-        // Log what prefix we're using
-        console.log("nop_rules_data object:", nop_rules_data);
-        console.log("Prefix value:", nop_rules_data.prefix);
-
-        // IMPORTANT: Hard-code the correct prefix if it's undefined
-        const actionPrefix = nop_rules_data.prefix || "nop_";
-        console.log("Using action prefix:", actionPrefix);
-
-        // Create structured rule data object from form with debugging
-        console.log("Building rule data from form elements");
-        const $form = $ruleForm;
-
-        // Log all form elements to identify what's available
-        console.log("All form elements:", $form.serializeArray());
-
-        // Build rule data object
-        const ruleData = {
-            id: $("#rule_id").val() || "",
-            name: $("#rule_name").val() || "",
-            description: $("#rule_description").val() || "",
-            category: $("#rule_category").val() || "",
-            priority: $("#rule_priority").val() || "10",
-            condition_type: $("#condition_type").val() || "",
-            action_type: $("#action_type").val() || "",
-            active: $("#rule_active").is(":checked"),
-            condition_value: $("#condition_value").val() || "",
-            action_value: $("#action_value").val() || "",
-            condition_settings: {},
-            action_settings: {},
-        };
-
-        console.log("Base rule data:", ruleData);
-
-        // Add condition-specific fields
-        console.log(
-            "Condition fields found:",
-            $("#condition_fields").find("input, select").length,
-        );
-        $("#condition_fields input, #condition_fields select").each(function () {
-            const name = $(this).attr("name");
-            const value = $(this).val();
-            console.log(`Adding condition field: ${name} = ${value}`);
-            ruleData.condition_settings[name] = value;
-        });
-
-        // Add action-specific fields
-        console.log(
-            "Action fields found:",
-            $("#action_fields").find("input, select").length,
-        );
-        $("#action_fields input, #action_fields select").each(function () {
-            const name = $(this).attr("name");
-            const value = $(this).val();
-            console.log(`Adding action field: ${name} = ${value}`);
-            ruleData.action_settings[name] = value;
-        });
-
-        // Add exclusive setting
-        ruleData.action_settings.exclusive = $("#action_exclusive").is(":checked");
-        console.log("Exclusive setting:", ruleData.action_settings.exclusive);
-
-        // Debug output complete rule data
-        console.log("Final rule data object:", ruleData);
-
-        // Create form data for AJAX request
-        const formData = new FormData();
-
-        // Use the correct action name - this is the key fix
-        formData.append("action", `${actionPrefix}save_rule`);
-        formData.append("nonce", nop_rules_data.nonce);
-
-        // Convert rule data to JSON string
-        const ruleDataJSON = JSON.stringify(ruleData);
-        console.log("Rule data JSON:", ruleDataJSON);
-        formData.append("rule_data", ruleDataJSON);
-
-        // Create a direct object for debugging in the Network tab
-        const directPostData = {
-            action: `${actionPrefix}save_rule`,
-            nonce: nop_rules_data.nonce,
-            rule_data: ruleDataJSON,
-        };
-
-        console.log("AJAX request about to be sent with data:", directPostData);
-
-        // Add a timestamp to avoid caching
-        formData.append("_", new Date().getTime());
-
-        $.ajax({
-            url: nop_rules_data.ajax_url,
-            type: "POST",
-            data: formData,
-            processData: false,
-            contentType: false,
-            beforeSend: (xhr) => {
-                console.log("AJAX request starting");
-                $ruleForm
-                    .find('button[type="submit"]')
-                    .prop("disabled", true)
-                    .text("Saving...");
-            },
-            success: (response) => {
-                console.log("AJAX response received:", response);
-                if (response.success) {
-                    console.log("Save successful, rule ID:", response.data.rule?.id);
-                    // Show success message
-                    showNotice(response.data.message, "success");
-
-                    // Close modal
-                    closeModal();
-
-                    // Refresh the page to see new rule
-                    window.location.reload();
-                } else {
-                    console.error("Save failed:", response.data.message);
-                    showNotice(response.data.message || "Save failed", "error");
-                    $ruleForm
-                        .find('button[type="submit"]')
-                        .prop("disabled", false)
-                        .text("Save Rule");
-                }
-            },
-            error: (xhr, status, error) => {
-                console.error("AJAX error:", { xhr, status, error });
-                console.error("Response text:", xhr.responseText);
-                showNotice(`Error saving rule: ${error}`, "error");
-                $ruleForm
-                    .find('button[type="submit"]')
-                    .prop("disabled", false)
-                    .text("Save Rule");
-            },
-            complete: () => {
-                console.log("AJAX request completed");
-            },
-        });
-    }
-    /**
-     * Update a rule in the table without reloading the page
-     */
-    function updateRuleInTable(rule) {
-        const ruleId = rule.id;
-        const $row = $(`tr[data-rule-id="${ruleId}"]`);
-
-        if ($row.length) {
-            // Update existing row
-            $row.find("td:nth-child(1)").text(rule.priority);
-            $row.find("td:nth-child(2)").text(rule.name);
-            $row.find("td:nth-child(3)").text(rule.description);
-            $row.find("td:nth-child(4)").text(getConditionLabel(rule.condition_type));
-            $row.find("td:nth-child(5)").text(getActionLabel(rule.action_type));
-
-            // Update status toggle
-            $row.find(".nop-rule-status").prop("checked", rule.active);
-        } else {
-            // Add new row
-            const $tbody = $rulesTable.find("tbody");
-            const $emptyRow = $tbody.find("tr td[colspan]").parent();
-
-            if ($emptyRow.length) {
-                // Remove "no rules" message
-                $emptyRow.remove();
-            }
-
-            // Create new row HTML
-            const newRow = `
-            <tr data-rule-id="${rule.id}">
-                <td>${rule.priority}</td>
-                <td>${rule.name}</td>
-                <td>${rule.description}</td>
-                <td>${getConditionLabel(rule.condition_type)}</td>
-                <td>${getActionLabel(rule.action_type)}</td>
-                <td>
-                    <div class="nop-status-toggle">
-                        <label class="nop-switch">
-                            <input type="checkbox" class="nop-rule-status" ${rule.active ? "checked" : ""}>
-                            <span class="nop-slider"></span>
-                        </label>
-                    </div>
-                </td>
-                <td>
-                    <button type="button" class="button nop-edit-rule">${nop_rules_data.i18n.edit}</button>
-                    <button type="button" class="button nop-delete-rule">${nop_rules_data.i18n.delete}</button>
-                </td>
-            </tr>
-        `;
-
-            $tbody.append(newRow);
-        }
-    }
-
-    /**
-     * Get condition label from condition type
-     */
-    function getConditionLabel(type) {
-        // First check if it exists in our condition_types object
-        if (nop_rules_data.condition_types?.[type]) {
-            return nop_rules_data.condition_types[type];
-        }
-        // Fallback to type name with improved formatting if label is not found
-        return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-    }
-
-    /**
-     * Get action label from action type
-     */
-    function getActionLabel(type) {
-        // First check if it exists in our action_types object
-        if (nop_rules_data.action_types?.[type]) {
-            return nop_rules_data.action_types[type];
-        }
-        // Fallback to type name with improved formatting if label is not found
-        return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-    }
-    // Confirm and delete rule
-    function confirmDeleteRule(ruleId) {
-        if (confirm(nop_rules_data.i18n.confirm_delete)) {
-            deleteRule(ruleId);
-        }
-    }
-
-    // Delete rule
-    function deleteRule(ruleId) {
-        // Ensure ruleId is a valid number
-        let internalRuleId = ruleId;
-        if (!internalRuleId || Number.isNaN(Number.parseInt(internalRuleId))) {
-            console.error("Invalid rule ID:", internalRuleId);
-            showNotice(
-                "Invalid rule ID. Please refresh the page and try again.",
-                "error",
-            );
-            return;
-        }
-
-        // Convert to integer to ensure it's handled properly
-        internalRuleId = Number.parseInt(internalRuleId);
-        console.log("Deleting rule ID:", internalRuleId);
-
-        $.ajax({
-            url: nop_rules_data.ajax_url,
-            type: "POST",
-            data: {
-                action: `${nop_rules_data.prefix}delete_rule`,
-                nonce: nop_rules_data.nonce,
-                rule_id: internalRuleId,
-            },
-            beforeSend: () => {
-                $(`tr[data-rule-id="${internalRuleId}"]`).addClass("nop-deleting");
-            },
-            success: (response) => {
-                console.log("Delete response:", response);
-                if (response.success) {
-                    $(`tr[data-rule-id="${internalRuleId}"]`).fadeOut(400, function () {
-                        $(this).remove();
-                        showNotice(response.data.message, "success");
-                        if ($rulesTable.find("tbody tr").length === 0) {
-                            $rulesTable.find("tbody").html(`
-                            <tr>
-                                <td colspan="7">${nop_rules_data.i18n.no_rules}</td>
-                            </tr>
-                        `);
-                        }
-                    });
-                } else {
-                    $(`tr[data-rule-id="${internalRuleId}"]`).removeClass("nop-deleting");
-                    showNotice(response.data.message, "error");
-                }
-            },
-            error: (xhr, status, error) => {
-                console.error("AJAX error:", { xhr, status, error });
-                console.error("Response text:", xhr.responseText);
-                $(`tr[data-rule-id="${internalRuleId}"]`).removeClass("nop-deleting");
-                showNotice(`Error deleting rule: ${error}`, "error");
-            },
-        });
-    }
-
-    // Toggle rule active state
-    function toggleRuleActive(ruleId, isActive) {
-        $.ajax({
-            url: nop_rules_data.ajax_url,
-            type: "POST",
-            data: {
-                action: `${nop_rules_data.prefix}toggle_rule`,
-                nonce: nop_rules_data.nonce,
-                rule_id: ruleId,
-                active: isActive ? 1 : 0,
-            },
-            beforeSend: () => {
-                const $row = $(`tr[data-rule-id="${ruleId}"]`);
-                const $checkbox = $row.find(".nop-rule-status");
-                // Disable the checkbox during the request
-                $checkbox.prop("disabled", true);
-            },
-            success: (response) => {
-                if (response.success) {
-                    showNotice(response.data.message, "success");
-
-                    // When activating a rule with a category, it might deactivate other categories
-                    // so we need to refresh the page
-                    if (isActive) {
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
-                    }
-                } else {
-                    showNotice(
-                        response.data.message || "Error updating rule status",
-                        "error",
-                    );
-                    // Revert checkbox state
-                    const $checkbox = $(`tr[data-rule-id="${ruleId}"]`).find(
-                        ".nop-rule-status",
-                    );
-                    $checkbox.prop("checked", !isActive);
-                }
-
-                // Re-enable the checkbox
-                $(`tr[data-rule-id="${ruleId}"]`)
-                    .find(".nop-rule-status")
-                    .prop("disabled", false);
-            },
-            error: (xhr, status, error) => {
-                console.error("AJAX error:", { xhr, status, error });
-                showNotice(`Error toggling rule: ${error}`, "error");
-
-                // Revert checkbox state
-                const $checkbox = $(`tr[data-rule-id="${ruleId}"]`).find(
-                    ".nop-rule-status",
-                );
-                $checkbox.prop("checked", !isActive).prop("disabled", false);
-            },
         });
     }
 
     // Show notification
     function showNotice(message, type) {
         $notice
-            .removeClass("hidden success error")
+            .removeClass("hidden success error info")
             .addClass(type)
             .text(message)
             .fadeIn();

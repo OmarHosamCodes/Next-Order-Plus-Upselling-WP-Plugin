@@ -123,6 +123,7 @@ class NOP_Cart_Service extends NOP_Base
             // Store if we have any free shipping rules
             $has_free_shipping = false;
             $total_discounts = 0;
+            $applied_rule_names = [];
 
             // Get all rules-based discounts
             $rules_discounts = $this->rules_manager->calculate_discounts($cart);
@@ -134,8 +135,10 @@ class NOP_Cart_Service extends NOP_Base
                 }
 
                 if ($discount['amount'] > 0) {
-                    $this->add_discount_fee($cart, $discount['amount'], $discount['label']);
+                    // Use rule name directly as the discount label
+                    $this->add_discount_fee($cart, $discount['amount'], $discount['rule_name']);
                     $total_discounts += $discount['amount'];
+                    $applied_rule_names[] = $discount['rule_name'];
                 }
 
                 // Check for free shipping
@@ -154,10 +157,16 @@ class NOP_Cart_Service extends NOP_Base
                 }
             }
 
-            // Store the current total discount in session
+            // Store the current total discount and applied rule names in session
             if (function_exists('WC') && WC()->session) {
                 WC()->session->set($this->prefix . 'total_savings', $total_discounts);
                 WC()->session->set($this->prefix . 'has_free_shipping', $has_free_shipping);
+
+                // Store applied rule names for persistent display
+                if (!empty($applied_rule_names)) {
+                    WC()->session->set($this->prefix . 'applied_rule_names', $applied_rule_names);
+                }
+
                 $this->log("Stored discount in session: {$total_discounts}, free shipping: " . ($has_free_shipping ? 'yes' : 'no'));
             }
         } catch (\Exception $e) {
@@ -216,15 +225,19 @@ class NOP_Cart_Service extends NOP_Base
         // Get stored discount
         $discount = 0;
         $has_free_shipping = false;
+        $applied_rule_names = [];
 
         if (function_exists('WC') && WC()->session) {
             $discount = (float) WC()->session->get($this->prefix . 'total_savings', 0);
             $has_free_shipping = (bool) WC()->session->get($this->prefix . 'has_free_shipping', false);
+            $applied_rule_names = WC()->session->get($this->prefix . 'applied_rule_names', []);
         }
 
         if ($discount > 0) {
-            $this->add_discount_fee($cart, $discount, $this->discount_label);
-            $this->log("Persistence: Applied stored discount of {$discount}");
+            // If we have stored rule names, use the first one as the discount label
+            $label = !empty($applied_rule_names) ? $applied_rule_names[0] : $this->discount_label;
+            $this->add_discount_fee($cart, $discount, $label);
+            $this->log("Persistence: Applied stored discount of {$discount} with label: {$label}");
         }
 
         // Store free shipping status in session for the shipping method filter
@@ -319,6 +332,7 @@ class NOP_Cart_Service extends NOP_Base
         try {
             $discount = 0;
             $has_free_shipping = false;
+            $applied_rule_names = [];
 
             if (function_exists('WC') && WC()->cart) {
                 // Get all rules-based discounts
@@ -328,6 +342,10 @@ class NOP_Cart_Service extends NOP_Base
                 foreach ($rules_discounts as $rule_discount) {
                     if (empty($rule_discount['conflict'])) {
                         $discount += $rule_discount['amount'];
+
+                        if (!empty($rule_discount['rule_name'])) {
+                            $applied_rule_names[] = $rule_discount['rule_name'];
+                        }
 
                         if (!empty($rule_discount['free_shipping'])) {
                             $has_free_shipping = true;
@@ -344,13 +362,19 @@ class NOP_Cart_Service extends NOP_Base
                 WC()->session->set($this->prefix . 'total_savings', $discount);
                 WC()->session->set($this->prefix . 'has_free_shipping', $has_free_shipping);
 
+                // Store applied rule names for display
+                if (!empty($applied_rule_names)) {
+                    WC()->session->set($this->prefix . 'applied_rule_names', $applied_rule_names);
+                }
+
                 $this->log("AJAX: Updated discount to {$discount}, free shipping: " . ($has_free_shipping ? 'yes' : 'no'));
             }
 
             wp_send_json_success([
                 'discount' => $discount,
                 'has_free_shipping' => $has_free_shipping,
-                'discount_formatted' => function_exists('wc_price') ? wc_price($discount) : '' . number_format($discount, 2)
+                'discount_formatted' => function_exists('wc_price') ? wc_price($discount) : '' . number_format($discount, 2),
+                'rule_names' => $applied_rule_names
             ]);
         } catch (\Exception $e) {
             $this->log("AJAX Error: " . $e->getMessage(), 'error');
@@ -368,17 +392,21 @@ class NOP_Cart_Service extends NOP_Base
     {
         $discount = 0;
         $has_free_shipping = false;
+        $applied_rule_names = [];
 
         if (function_exists('WC') && WC()->session) {
             $discount = (float) WC()->session->get($this->prefix . 'total_savings', 0);
             $has_free_shipping = (bool) WC()->session->get($this->prefix . 'has_free_shipping', false);
+            $applied_rule_names = WC()->session->get($this->prefix . 'applied_rule_names', []);
         }
 
         ob_start();
         if ($discount > 0) {
+            // Use the first rule name if available, otherwise fall back to the default label
+            $label = !empty($applied_rule_names) ? $applied_rule_names[0] : $this->discount_label;
             ?>
             <div class="mini-cart-discount">
-                <span class="mini-cart-discount-label"><?php echo esc_html($this->discount_label); ?></span>
+                <span class="mini-cart-discount-label"><?php echo esc_html($label); ?></span>
                 <span
                     class="mini-cart-discount-amount">-<?php echo function_exists('wc_price') ? wc_price($discount) : '' . number_format($discount, 2); ?></span>
             </div>
@@ -410,16 +438,20 @@ class NOP_Cart_Service extends NOP_Base
     {
         $discount = 0;
         $has_free_shipping = false;
+        $applied_rule_names = [];
 
         if (function_exists('WC') && WC()->session) {
             $discount = (float) WC()->session->get($this->prefix . 'total_savings', 0);
             $has_free_shipping = (bool) WC()->session->get($this->prefix . 'has_free_shipping', false);
+            $applied_rule_names = WC()->session->get($this->prefix . 'applied_rule_names', []);
         }
 
         if ($discount > 0) {
+            // Use the first rule name if available, otherwise fall back to the default label
+            $label = !empty($applied_rule_names) ? $applied_rule_names[0] : $this->discount_label;
             ?>
             <div class="mini-cart-discount">
-                <span class="mini-cart-discount-label"><?php echo esc_html($this->discount_label); ?></span>
+                <span class="mini-cart-discount-label"><?php echo esc_html($label); ?></span>
                 <span
                     class="mini-cart-discount-amount">-<?php echo function_exists('wc_price') ? wc_price($discount) : '' . number_format($discount, 2); ?></span>
             </div>

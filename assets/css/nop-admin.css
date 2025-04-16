@@ -1,0 +1,375 @@
+/**
+ * Next Order Plus - Admin Styles
+ *
+ * Modern and clean styles for the plugin admin interface
+ */
+
+/* Base variables */
+:root {
+	--nop-primary: #2271b1;
+	--nop-primary-dark: #135e96;
+	--nop-primary-light: #e6f0f8;
+	--nop-success: #00a32a;
+	--nop-success-light: #edfaef;
+	--nop-error: #d63638;
+	--nop-error-light: #fcf0f1;
+	--nop-warning: #dba617;
+	--nop-warning-light: #fcf9e8;
+	--nop-info: #72aee6;
+	--nop-info-light: #f0f6fc;
+	--nop-text: #1d2327;
+	--nop-text-light: #646970;
+	--nop-border: #dcdcde;
+	--nop-border-light: #f0f0f1;
+	--nop-shadow: rgba(0, 0, 0, 0.05);
+	--nop-radius: 6px;
+}
+
+/* Main layout */
+.nop-settings-wrap {
+	margin: 20px 0;
+	color: var(--nop-text);
+}
+
+.nop-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 20px;
+}
+
+.nop-header h1 {
+	margin: 0;
+	font-weight: 500;
+}
+
+.nop-header-actions {
+	display: flex;
+	gap: 10px;
+}
+
+.nop-header-actions .button {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.nop-header-actions .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+	margin-right: 4px;
+}
+
+.nop-container {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 350px;
+	gap: 24px;
+	margin-top: 20px;
+}
+
+/* Cards */
+.nop-card {
+	background-color: #fff;
+	border-radius: var(--nop-radius);
+	box-shadow: 0 2px 10px var(--nop-shadow);
+	overflow: hidden;
+	margin-bottom: 24px;
+}
+
+.nop-card-primary {
+	border-top: 3px solid var(--nop-primary);
+}
+
+.nop-card-header {
+	padding: 20px 24px;
+	border-bottom: 1px solid var(--nop-border-light);
+}
+
+.nop-card-header h2 {
+	margin: 0 0 5px 0;
+	font-weight: 500;
+	font-size: 18px;
+	color: var(--nop-text);
+}
+
+.nop-card-header p {
+	margin: 0;
+	color: var(--nop-text-light);
+	font-size: 14px;
+}
+
+.nop-card-content {
+	padding: 24px;
+}
+
+/* Form elements */
+.nop-field {
+	margin-bottom: 20px;
+}
+
+.nop-field label {
+	display: block;
+	margin-bottom: 8px;
+	font-weight: 500;
+	color: var(--nop-text);
+}
+
+.nop-field input[type="text"],
+.nop-field input[type="number"],
+.nop-field textarea {
+	width: 100%;
+	padding: 10px;
+	border: 1px solid var(--nop-border);
+	border-radius: 4px;
+	background-color: #fff;
+	color: var(--nop-text);
+	font-size: 14px;
+}
+
+.nop-field-readonly input {
+	background-color: #f6f7f7;
+	cursor: not-allowed;
+}
+
+.nop-field-description {
+	margin: 8px 0 0 0;
+	color: var(--nop-text-light);
+	font-size: 13px;
+	font-style: italic;
+}
+
+.nop-fields-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 20px;
+}
+
+.nop-form-actions {
+	margin-top: 24px;
+}
+
+.nop-button {
+	padding: 8px 16px !important;
+	height: auto !important;
+	line-height: 1.5 !important;
+	font-weight: 500 !important;
+}
+
+/* Toggle switch for read-only display */
+.nop-toggle-readonly {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background-color: #f6f7f7;
+	border-radius: 4px;
+	padding: 10px;
+}
+
+.nop-toggle-slider {
+	position: relative;
+	display: inline-block;
+	width: 36px;
+	height: 20px;
+	background-color: #ccc;
+	border-radius: 10px;
+	transition: all 0.3s;
+}
+
+.nop-toggle-slider.active {
+	background-color: var(--nop-success);
+}
+
+.nop-toggle-slider:before {
+	content: "";
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background-color: white;
+	top: 2px;
+	left: 2px;
+	transition: all 0.3s;
+}
+
+.nop-toggle-slider.active:before {
+	transform: translateX(16px);
+}
+
+.nop-toggle-text {
+	font-size: 14px;
+	color: var(--nop-text);
+}
+
+/* Notices */
+.nop-notice {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	border-radius: var(--nop-radius);
+	margin-bottom: 20px;
+}
+
+.nop-notice p {
+	margin: 0;
+	font-size: 14px;
+}
+
+.nop-notice .dashicons {
+	font-size: 20px;
+	width: 20px;
+	height: 20px;
+}
+
+.nop-notice-success {
+	background-color: var(--nop-success-light);
+	color: var(--nop-success);
+}
+
+.nop-notice-error {
+	background-color: var(--nop-error-light);
+	color: var(--nop-error);
+}
+
+.nop-notice-warning {
+	background-color: var(--nop-warning-light);
+	color: var(--nop-warning);
+}
+
+.nop-notice-info {
+	background-color: var(--nop-info-light);
+	color: var(--nop-info);
+}
+
+/* Info Note */
+.nop-action-note {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	background-color: var(--nop-info-light);
+	padding: 12px;
+	border-radius: 4px;
+	margin-top: 20px;
+}
+
+.nop-action-note .dashicons {
+	color: var(--nop-info);
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+.nop-action-note p {
+	margin: 0;
+	font-size: 14px;
+	color: var(--nop-text);
+}
+
+/* Card Meta */
+.nop-card-meta {
+	margin-bottom: 16px;
+}
+
+.nop-meta-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.nop-meta-item .dashicons {
+	color: var(--nop-primary);
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+/* How it works steps */
+.nop-steps {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.nop-step {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+}
+
+.nop-step-number {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 28px;
+	height: 28px;
+	background-color: var(--nop-primary);
+	color: white;
+	border-radius: 50%;
+	font-weight: bold;
+	font-size: 14px;
+	flex-shrink: 0;
+}
+
+.nop-step p {
+	margin: 0;
+	font-size: 14px;
+	line-height: 1.5;
+	padding-top: 3px;
+}
+
+/* Quick Links */
+.nop-links {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.nop-link {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	background-color: #f6f7f7;
+	border-radius: 4px;
+	text-decoration: none;
+	color: var(--nop-text);
+	font-size: 14px;
+	transition: all 0.2s;
+}
+
+.nop-link:hover {
+	background-color: var(--nop-primary-light);
+	color: var(--nop-primary);
+}
+
+.nop-link .dashicons {
+	color: var(--nop-primary);
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 960px) {
+	.nop-container {
+		grid-template-columns: 1fr;
+	}
+
+	.nop-fields-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media screen and (max-width: 782px) {
+	.nop-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 15px;
+	}
+
+	.nop-step {
+		align-items: center;
+	}
+}

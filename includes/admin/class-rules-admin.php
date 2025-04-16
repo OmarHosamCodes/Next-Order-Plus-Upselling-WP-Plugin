@@ -68,14 +68,52 @@ class NOP_Rules_Admin extends NOP_Base
      */
     public function add_rules_submenu(): void
     {
-        add_submenu_page(
-            $this->prefix . 'settings',
-            __('Upsell Rules', 'next-order-plus'),
-            __('Upsell Rules', 'next-order-plus'),
-            'manage_options',
-            $this->prefix . 'rules',
-            [$this, 'render_rules_page']
-        );
+        // Check if "SOM Plugins" menu exists
+        global $menu;
+        $som_menu_exists = false;
+
+        foreach ($menu as $item) {
+            if (isset($item[0]) && $item[0] === 'SOM Plugins') {
+                $som_menu_exists = true;
+                break;
+            }
+        }
+
+        // If SOM menu exists, add as submenu there
+        if ($som_menu_exists) {
+            add_submenu_page(
+                'som-plugins',
+                __('Promotion Rules', 'next-order-plus'),
+                __('Promotion Rules', 'next-order-plus'),
+                'manage_options',
+                $this->prefix . 'rules',
+                [$this, 'render_rules_page']
+            );
+            return;
+        }
+
+        // Check if our main plugin menu exists
+        $main_menu_exists = false;
+        foreach ($menu as $item) {
+            if (isset($item[2]) && $item[2] === $this->prefix . 'settings') {
+                $main_menu_exists = true;
+                break;
+            }
+        }
+
+        // If our main menu exists, add as submenu there
+        if ($main_menu_exists) {
+            // Add as submenu to our main plugin menu
+            add_submenu_page(
+                $this->prefix . 'settings',
+                __('Promotion Rules', 'next-order-plus'),
+                __('Promotion Rules', 'next-order-plus'),
+                'manage_options',
+                $this->prefix . 'rules',
+                [$this, 'render_rules_page']
+            );
+            return;
+        }
     }
 
     /**
@@ -191,7 +229,7 @@ class NOP_Rules_Admin extends NOP_Base
 
         ?>
         <div class="wrap nop-rules-wrap">
-            <h1><?php echo esc_html__('Upsell Rules', 'next-order-plus'); ?></h1>
+            <h1><?php echo esc_html__('Promotion Rules', 'next-order-plus'); ?></h1>
 
             <div class="nop-rules-header">
                 <p><?php echo esc_html__('Create and manage upsell rules for your store. Rules are evaluated in priority order (lower number = higher priority).', 'next-order-plus'); ?>
@@ -284,54 +322,7 @@ class NOP_Rules_Admin extends NOP_Base
                                 <option value="item_count"><?php echo esc_html__('Item Count', 'next-order-plus'); ?></option>
                                 <option value="specific_product"><?php echo esc_html__('Specific Product', 'next-order-plus'); ?></option>
                                 <option value="product_count"><?php echo esc_html__('Product Count', 'next-order-plus'); ?></option>
-                                <option value="custom"><?php echo esc_html__('Custom', 'next-order-plus'); ?></option>
                             </select>
-                            <p class="description">
-                                <?php echo esc_html__('Only one category can be active at a time. Rules in the same category can be active simultaneously.', 'next-order-plus'); ?>
-                            </p>
-                        </div>
-
-                        <!-- Category Progress Bar -->
-                        <div class="nop-form-group nop-category-progress">
-                            <label><?php echo esc_html__('Active Category', 'next-order-plus'); ?></label>
-                            <div class="nop-progress-container">
-                                <?php
-                                // Get active category
-                                $active_category = '';
-                                $categories = array(
-                                    'cart_total' => __('Cart Total', 'next-order-plus'),
-                                    'item_count' => __('Item Count', 'next-order-plus'),
-                                    'specific_product' => __('Specific Product', 'next-order-plus'),
-                                    'product_count' => __('Product Count', 'next-order-plus'),
-                                    'custom' => __('Custom', 'next-order-plus')
-                                );
-
-                                foreach ($rules as $rule) {
-                                    if ($rule->is_active()) {
-                                        $active_category = $rule->get_category();
-                                        break;
-                                    }
-                                }
-                                
-                                // Display the active category name
-                                $active_label = !empty($active_category) && isset($categories[$active_category]) 
-                                    ? $categories[$active_category] 
-                                    : __('None', 'next-order-plus');
-                                
-                                // Generate the progress bar
-                                echo '<div class="nop-progress-bar">';
-                                foreach ($categories as $cat_key => $cat_label) {
-                                    $is_active = ($active_category === $cat_key);
-                                    $class = $is_active ? 'active' : '';
-                                    echo '<div class="nop-progress-segment ' . $class . '" data-category="' . esc_attr($cat_key) . '">' . esc_html($cat_label) . '</div>';
-                                }
-                                echo '</div>';
-                                ?>
-                                <p class="description">
-                                    <?php echo esc_html__('Currently active category:', 'next-order-plus'); ?> 
-                                    <strong id="nop-active-category"><?php echo esc_html($active_label); ?></strong>
-                                </p>
-                            </div>
                         </div>
 
                         <div class="nop-form-group">
@@ -401,6 +392,7 @@ class NOP_Rules_Admin extends NOP_Base
         </div>
         <?php
     }
+
     /**
      * Get products for select input
      *
@@ -421,7 +413,11 @@ class NOP_Rules_Admin extends NOP_Base
             foreach ($query->posts as $product_id) {
                 $product = wc_get_product($product_id);
                 if ($product) {
-                    $products[$product_id] = $product->get_name();
+                    // Format data for Select2: id and text properties
+                    $products[] = [
+                        'id' => (string)$product_id, // Convert to string for Select2 compatibility
+                        'text' => $product->get_name()
+                    ];
                 }
             }
         }

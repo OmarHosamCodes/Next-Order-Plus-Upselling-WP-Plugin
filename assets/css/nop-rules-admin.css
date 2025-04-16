@@ -48,6 +48,16 @@
 /* Category headers */
 .nop-category-header {
 	background-color: #f0f0f0;
+	position: relative;
+	transition: all 0.3s ease;
+}
+
+.nop-category-header.active {
+	background-color: #edfaef;
+}
+
+.nop-category-header.inactive {
+	opacity: 0.7;
 }
 
 .nop-category-name {
@@ -62,12 +72,13 @@
 
 /* Inactive category styling */
 tr.nop-inactive-category {
-	opacity: 0.6;
-	filter: grayscale(50%);
+	opacity: 0.5;
+	filter: grayscale(40%);
+	transition: all 0.3s ease;
 }
 
 tr.nop-inactive-category:hover {
-	opacity: 0.8;
+	opacity: 0.7;
 }
 
 tr.nop-inactive-category td {
@@ -283,6 +294,65 @@ tr.nop-deleting {
 	.select2-selection--single
 	.select2-selection__arrow {
 	height: 38px;
+}
+
+/* Category selector controls outside modal */
+.nop-category-controls {
+	margin: 20px 0;
+	padding: 15px;
+	background-color: #fff;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.nop-category-controls h2 {
+	margin-top: 0;
+	font-size: 1.2em;
+	border-bottom: 1px solid #f0f0f0;
+	padding-bottom: 10px;
+	margin-bottom: 15px;
+}
+
+.nop-category-selector {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 15px;
+}
+
+.nop-category-selector select {
+	flex: 1;
+	min-width: 200px;
+}
+
+.nop-category-indicator {
+	margin-top: 15px;
+}
+
+.nop-active-badge {
+	display: inline-block;
+	padding: 5px 10px;
+	background-color: #edfaef;
+	border-left: 3px solid #46b450;
+	color: #1e7e34;
+}
+
+/* Animation for category changes */
+@keyframes highlight {
+	0% {
+		background-color: transparent;
+	}
+	50% {
+		background-color: #fffbcc;
+	}
+	100% {
+		background-color: transparent;
+	}
+}
+
+.nop-category-highlight {
+	animation: highlight 2s ease-in-out;
 }
 
 /* Responsive */
