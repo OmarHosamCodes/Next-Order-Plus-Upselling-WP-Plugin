@@ -351,6 +351,108 @@
 	height: 18px;
 }
 
+/* Active Category and Rules Styles */
+.nop-active-category {
+	background-color: var(--nop-success-light);
+	border-radius: var(--nop-radius);
+	padding: 16px;
+	margin-bottom: 20px;
+}
+
+.nop-active-category-name {
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--nop-text);
+	margin: 0 0 16px 0;
+	display: flex;
+	align-items: center;
+	text-transform: capitalize;
+}
+
+.nop-badge {
+	display: inline-block;
+	padding: 4px 8px;
+	background-color: var(--nop-success);
+	color: white;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+	margin-right: 10px;
+}
+
+.nop-active-rules h4 {
+	margin: 0 0 12px 0;
+	font-size: 15px;
+	color: var(--nop-text);
+}
+
+.nop-active-rules-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.nop-active-rules-list li {
+	background-color: white;
+	border: 1px solid var(--nop-border-light);
+	border-radius: var(--nop-radius);
+	padding: 16px;
+	margin-bottom: 10px;
+	position: relative;
+}
+
+.nop-active-rules-list li:last-child {
+	margin-bottom: 0;
+}
+
+.nop-rule-name {
+	display: block;
+	font-weight: 600;
+	font-size: 16px;
+	margin-bottom: 10px;
+	color: var(--nop-primary);
+	padding-right: 70px;
+}
+
+.nop-rule-details {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.nop-rule-detail {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.nop-rule-status {
+	position: absolute;
+	top: 16px;
+	right: 16px;
+	display: inline-block;
+	padding: 4px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.nop-rule-status.active {
+	background-color: var(--nop-success-light);
+	color: var(--nop-success);
+}
+
+.nop-rule-status.inactive {
+	background-color: #f8f9fa;
+	color: #6c757d;
+}
+
+.nop-category-actions {
+	margin-top: 16px;
+	display: flex;
+	justify-content: flex-end;
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 960px) {
 	.nop-container {
@@ -358,6 +460,10 @@
 	}
 
 	.nop-fields-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.nop-rule-details {
 		grid-template-columns: 1fr;
 	}
 }
@@ -371,5 +477,14 @@
 
 	.nop-step {
 		align-items: center;
+	}
+
+	.nop-rule-status {
+		position: static;
+		margin-top: 10px;
+	}
+
+	.nop-rule-name {
+		padding-right: 0;
 	}
 }

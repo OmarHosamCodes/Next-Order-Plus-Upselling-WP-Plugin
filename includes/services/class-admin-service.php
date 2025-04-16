@@ -282,15 +282,7 @@ class NOP_Admin_Service extends NOP_Base
      */
     public function render_settings_page(): void
     {
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            return;
-        }
-
-        // Get plugin options
         $options = $this->get_options();
-
-        // Get rules page URL
         $rules_page_url = admin_url('admin.php?page=' . $this->prefix . 'rules');
 
         // Admin page wrapper
@@ -324,6 +316,17 @@ class NOP_Admin_Service extends NOP_Base
                 <main class="nop-main">
                     <div class="nop-card nop-card-primary">
                         <div class="nop-card-header">
+                            <h2><?php esc_html_e('Active Promotion Category', 'next-order-plus'); ?></h2>
+                            <p><?php esc_html_e('The currently active promotion and its associated rules.', 'next-order-plus'); ?>
+                            </p>
+                        </div>
+                        <div class="nop-card-content">
+                            <?php $this->render_active_category_and_rules(); ?>
+                        </div>
+                    </div>
+
+                    <div class="nop-card">
+                        <div class="nop-card-header">
                             <h2><?php esc_html_e('Coupon Restrictions', 'next-order-plus'); ?></h2>
                             <p><?php esc_html_e('Configure which coupon codes cannot be used together with this promotion.', 'next-order-plus'); ?>
                             </p>
@@ -356,23 +359,23 @@ class NOP_Admin_Service extends NOP_Base
 
                     <div class="nop-card">
                         <div class="nop-card-header">
-                            <h2><?php esc_html_e('Plugin Settings', 'next-order-plus'); ?></h2>
+                            <h2><?php esc_html_e('Current Settings', 'next-order-plus'); ?></h2>
                         </div>
                         <div class="nop-card-content">
                             <div class="nop-fields-grid">
                                 <div class="nop-field nop-field-readonly">
                                     <label><?php esc_html_e('Discount Label', 'next-order-plus'); ?></label>
-                                    <input type="text" value="<?php echo esc_attr($options['discount_label']); ?>" readonly>
+                                    <input type="text" readonly value="<?php echo esc_attr($options['discount_label']); ?>">
                                     <p class="nop-field-description">
-                                        <?php esc_html_e('The label displayed in cart/checkout for this discount.', 'next-order-plus'); ?>
+                                        <?php esc_html_e('Label shown in cart when discount is applied.', 'next-order-plus'); ?>
                                     </p>
                                 </div>
 
                                 <div class="nop-field nop-field-readonly">
                                     <label><?php esc_html_e('Minimum Items', 'next-order-plus'); ?></label>
-                                    <input type="number" value="<?php echo esc_attr($options['min_items']); ?>" readonly>
+                                    <input type="number" readonly value="<?php echo esc_attr($options['min_items']); ?>">
                                     <p class="nop-field-description">
-                                        <?php esc_html_e('Minimum number of items required for discount to apply.', 'next-order-plus'); ?>
+                                        <?php esc_html_e('Minimum number of items needed for discount.', 'next-order-plus'); ?>
                                     </p>
                                 </div>
 
@@ -458,7 +461,7 @@ class NOP_Admin_Service extends NOP_Base
                                 </div>
                                 <div class="nop-step">
                                     <span class="nop-step-number">4</span>
-                                    <p><?php esc_html_e('For every 4 items, another discount is applied', 'next-order-plus'); ?>
+                                    <p><?php esc_html_e('For every 4 items, an additional free item discount is applied', 'next-order-plus'); ?>
                                     </p>
                                 </div>
                             </div>
@@ -469,21 +472,22 @@ class NOP_Admin_Service extends NOP_Base
                         <div class="nop-card-header">
                             <h2><?php esc_html_e('Quick Links', 'next-order-plus'); ?></h2>
                         </div>
-                        <div class="nop-card-content nop-links">
-                            <a href="<?php echo esc_url($rules_page_url); ?>" class="nop-link">
-                                <span class="dashicons dashicons-list-view"></span>
-                                <?php esc_html_e('Manage Promotion Rules', 'next-order-plus'); ?>
-                            </a>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=shipping')); ?>"
-                                class="nop-link">
-                                <span class="dashicons dashicons-car"></span>
-                                <?php esc_html_e('WooCommerce Shipping Settings', 'next-order-plus'); ?>
-                            </a>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=wc-reports&tab=orders')); ?>"
-                                class="nop-link">
-                                <span class="dashicons dashicons-chart-bar"></span>
-                                <?php esc_html_e('WooCommerce Order Reports', 'next-order-plus'); ?>
-                            </a>
+                        <div class="nop-card-content">
+                            <div class="nop-links">
+                                <a href="<?php echo esc_url($rules_page_url); ?>" class="nop-link">
+                                    <span class="dashicons dashicons-list-view"></span>
+                                    <?php esc_html_e('Manage Promotion Rules', 'next-order-plus'); ?>
+                                </a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings')); ?>" class="nop-link">
+                                    <span class="dashicons dashicons-admin-settings"></span>
+                                    <?php esc_html_e('WooCommerce Settings', 'next-order-plus'); ?>
+                                </a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=wc-reports&tab=orders')); ?>"
+                                    class="nop-link">
+                                    <span class="dashicons dashicons-chart-bar"></span>
+                                    <?php esc_html_e('WooCommerce Order Reports', 'next-order-plus'); ?>
+                                </a>
+                            </div>
                         </div>
                     </div>
 
@@ -539,5 +543,137 @@ class NOP_Admin_Service extends NOP_Base
 
         $options = get_option($this->option_name, []);
         return wp_parse_args($options, $defaults);
+    }
+
+    /**
+     * Render active category and its rules
+     *
+     * Displays information about the currently active promotion category and rules
+     *
+     * @since 1.1.0
+     * @return void
+     */
+    public function render_active_category_and_rules(): void
+    {
+        // Attempt to get the rules manager instance from the main plugin class
+        $plugin_instance = \NOP_Plugin::get_instance();
+        $rules_manager = null;
+
+        if (method_exists($plugin_instance, 'get_rules_manager')) {
+            $rules_manager = $plugin_instance->get_rules_manager();
+        }
+
+        if (!$rules_manager) {
+            ?>
+            <div class="nop-notice nop-notice-warning">
+                <span class="dashicons dashicons-warning"></span>
+                <p><?php esc_html_e('Could not retrieve rules manager. Please ensure the plugin is correctly installed.', 'next-order-plus'); ?>
+                </p>
+            </div>
+            <?php
+            return;
+        }
+
+        // Get all rules
+        $rules = $rules_manager->get_rules();
+
+        // Find active category and rules
+        $active_category = '';
+        $active_rules = [];
+
+        foreach ($rules as $rule) {
+            if ($rule->is_active() && !empty($rule->get_category())) {
+                $active_category = $rule->get_category();
+                break;
+            }
+        }
+
+        // Now get all rules in the active category
+        if (!empty($active_category)) {
+            foreach ($rules as $rule) {
+                if ($rule->get_category() === $active_category) {
+                    $active_rules[] = $rule;
+                }
+            }
+        }
+
+        if (empty($active_category)) {
+            ?>
+            <div class="nop-notice nop-notice-info">
+                <span class="dashicons dashicons-info"></span>
+                <p><?php esc_html_e('No active promotion category found. Visit the Rules page to set up and activate promotion rules.', 'next-order-plus'); ?>
+                </p>
+            </div>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=' . $this->prefix . 'rules')); ?>" class="button button-primary">
+                <?php esc_html_e('Set Up Rules', 'next-order-plus'); ?>
+            </a>
+            <?php
+            return;
+        }
+        ?>
+
+        <div class="nop-active-category">
+            <h3 class="nop-active-category-name">
+                <span class="nop-badge"><?php esc_html_e('Active', 'next-order-plus'); ?></span>
+                <?php echo esc_html(ucfirst($active_category)); ?>
+            </h3>
+
+            <div class="nop-active-rules">
+                <h4><?php esc_html_e('Active Rules in this Category', 'next-order-plus'); ?>:</h4>
+
+                <?php if (empty($active_rules)): ?>
+                    <p><?php esc_html_e('No rules found in this category.', 'next-order-plus'); ?></p>
+                <?php else: ?>
+                    <ul class="nop-active-rules-list">
+                        <?php foreach ($active_rules as $rule): ?>
+                            <li>
+                                <span class="nop-rule-name"><?php echo esc_html($rule->get_name()); ?></span>
+
+                                <div class="nop-rule-details">
+                                    <div class="nop-rule-detail">
+                                        <strong><?php esc_html_e('Description', 'next-order-plus'); ?>:</strong>
+                                        <?php echo esc_html($rule->get_description()); ?>
+                                    </div>
+                                    <div class="nop-rule-detail">
+                                        <strong><?php esc_html_e('Condition', 'next-order-plus'); ?>:</strong>
+                                        <?php
+                                        if (method_exists($rules_manager, 'get_condition_label')) {
+                                            echo esc_html($rules_manager->get_condition_label($rule->get_condition_type()));
+                                        } else {
+                                            echo esc_html($rule->get_condition_type());
+                                        }
+                                        ?>
+                                    </div>
+                                    <div class="nop-rule-detail">
+                                        <strong><?php esc_html_e('Action', 'next-order-plus'); ?>:</strong>
+                                        <?php
+                                        if (method_exists($rules_manager, 'get_action_label')) {
+                                            echo esc_html($rules_manager->get_action_label($rule->get_action_type()));
+                                        } else {
+                                            echo esc_html($rule->get_action_type());
+                                        }
+                                        ?>
+                                    </div>
+                                    <div class="nop-rule-detail">
+                                        <strong><?php esc_html_e('Priority', 'next-order-plus'); ?>:</strong>
+                                        <?php echo esc_html($rule->get_priority()); ?>
+                                    </div>
+                                </div>
+
+                                <span class="nop-rule-status active"><?php esc_html_e('Active', 'next-order-plus'); ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
+                <div class="nop-category-actions">
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=' . $this->prefix . 'rules')); ?>" class="button">
+                        <?php esc_html_e('Manage All Rules', 'next-order-plus'); ?>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <?php
     }
 }

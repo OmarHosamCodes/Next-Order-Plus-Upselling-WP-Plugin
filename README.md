@@ -39,22 +39,12 @@ A highly optimized WooCommerce plugin that automatically applies a "Next Order P
 - **Extensible Design**: Filterable settings and hooks for customization
 - **Robust Error Handling**: Graceful degradation on errors
 
-## Installation
+## Installationreplace 
 
 1. Upload the `next-order-plus` folder to the `/wp-content/plugins/` directory
 2. Activate the plugin through the 'Plugins' menu in WordPress
 3. Ensure WooCommerce is installed and activated
 4. Configure settings via WooCommerce > Next Order Plus or SOM Plugins > Next Order Plus
-
-## Admin Settings
-
-The plugin offers a comprehensive settings page with the following options:
-
-- **Discount Label**: Customize the text displayed in the cart/checkout
-- **Minimum Items**: Set the threshold for when the discount applies (default: 4)
-- **Excluded Coupons**: Specify coupon codes that cannot be used with this promotion
-- **Disable Free Shipping**: Option to disable free shipping when discount is applied
-- **Debug Mode**: Enable/disable detailed logging for troubleshooting
 
 ## Customization
 
