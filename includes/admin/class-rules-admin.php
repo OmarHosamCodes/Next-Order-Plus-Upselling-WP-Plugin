@@ -226,6 +226,26 @@ class NOP_Rules_Admin extends NOP_Base
         }
 
         $rules = $this->rules_manager->get_rules();
+        
+        // Find active category and rules
+        $active_category = '';
+        $active_rules = [];
+        
+        foreach ($rules as $rule) {
+            if ($rule->is_active() && !empty($rule->get_category())) {
+                $active_category = $rule->get_category();
+                break;
+            }
+        }
+        
+        // Now get all rules in the active category
+        if (!empty($active_category)) {
+            foreach ($rules as $rule) {
+                if ($rule->get_category() === $active_category) {
+                    $active_rules[] = $rule;
+                }
+            }
+        }
 
         ?>
         <div class="wrap nop-rules-wrap">
@@ -239,6 +259,26 @@ class NOP_Rules_Admin extends NOP_Base
                     <?php echo esc_html__('Add New Rule', 'next-order-plus'); ?>
                 </button>
             </div>
+
+            <?php if (!empty($active_category)): ?>
+            <div class="nop-active-category-summary">
+                <h2><?php echo esc_html__('Active Category', 'next-order-plus'); ?>: <?php echo esc_html(ucfirst($active_category)); ?></h2>
+                <div class="nop-active-rules">
+                    <h3><?php echo esc_html__('Rules in this category', 'next-order-plus'); ?>:</h3>
+                    <ul class="nop-active-rules-list">
+                        <?php foreach ($active_rules as $rule): ?>
+                            <li>
+                                <span class="nop-rule-name"><?php echo esc_html($rule->get_name()); ?></span>
+                                <span class="nop-rule-description"><?php echo esc_html($rule->get_description()); ?></span>
+                                <span class="nop-rule-status <?php echo $rule->is_active() ? 'active' : 'inactive'; ?>">
+                                    <?php echo $rule->is_active() ? esc_html__('Active', 'next-order-plus') : esc_html__('Inactive', 'next-order-plus'); ?>
+                                </span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <div class="nop-rules-notice hidden"></div>
 

@@ -38,6 +38,330 @@
         checkUrlParams();
     }
 
+    // Open modal to add a new rule
+    function openAddRuleModal() {
+        // Reset form
+        $ruleForm[0].reset();
+        $("#rule_id").val("");
+
+        // Set modal title
+        $modalTitle.text(nop_rules_data.i18n.add_rule || "Add Rule");
+
+        // Reset condition and action fields
+        $conditionFields.empty();
+        $actionFields.empty();
+
+        // Show the action form fields
+        addActionTypeSelect();
+
+        // Show modal
+        $modal.show();
+    }
+
+    // Open modal to edit an existing rule
+    function openEditRuleModal(ruleData) {
+        // Set form fields
+        $("#rule_id").val(ruleData.id);
+        $("#rule_name").val(ruleData.name);
+        $("#rule_description").val(ruleData.description);
+        $("#rule_category").val(ruleData.category);
+        $("#rule_priority").val(ruleData.priority);
+        $("#rule_active").prop("checked", ruleData.active);
+
+        // Set condition type (hidden field)
+        $("#condition_type").val(ruleData.condition_type);
+
+        // Set modal title
+        $modalTitle.text(nop_rules_data.i18n.edit_rule || "Edit Rule");
+
+        // Generate condition fields based on condition type
+        updateConditionFields(
+            ruleData.condition_type,
+            ruleData.condition_value,
+            ruleData.condition_params,
+        );
+
+        // Add action type select and populate with current action
+        addActionTypeSelect(
+            ruleData.action_type,
+            ruleData.action_value,
+            ruleData.action_params,
+        );
+
+        // Show modal
+        $modal.show();
+    }
+
+    // Close the rule modal
+    function closeModal() {
+        $modal.hide();
+    }
+
+    // Add action type select to form
+    function addActionTypeSelect(selectedType, selectedValue, params) {
+        // Create action type selector
+        const $actionTypeGroup = $("<div class='nop-form-group'></div>");
+        $actionTypeGroup.append(
+            `<label for="action_type">${nop_rules_data.i18n.action || "Action"}</label>`,
+        );
+
+        const $actionTypeSelect = $(
+            "<select id='action_type' name='action_type' required></select>",
+        );
+        $actionTypeSelect.append(
+            `<option value="">${nop_rules_data.i18n.select_action || "Select an action"}</option>`,
+        );
+
+        // Add available action types from data
+        if (nop_rules_data.action_types) {
+            Object.entries(nop_rules_data.action_types).forEach(([value, label]) => {
+                const $option = $(`<option value="${value}">${label}</option>`);
+                $actionTypeSelect.append($option);
+            });
+        }
+
+        // Set selected value if provided
+        if (selectedType) {
+            $actionTypeSelect.val(selectedType);
+        }
+
+        $actionTypeGroup.append($actionTypeSelect);
+        $actionFields.html($actionTypeGroup);
+
+        // If a type is selected, create the specific fields for that type
+        if (selectedType) {
+            updateActionFields(selectedType, selectedValue, params);
+        }
+    }
+
+    // Update action fields based on selected action type
+    function updateActionFields(type, value, params) {
+        const actionType = type || $("#action_type").val();
+
+        if (!actionType) {
+            return;
+        }
+
+        // Clear existing fields except the type selector
+        $actionFields.find(".nop-form-group:not(:first)").remove();
+
+        // Add appropriate fields based on action type
+        switch (actionType) {
+            case "percentage_discount":
+                $actionFields.append(`
+                    <div class="nop-form-group">
+                        <label for="action_value">${nop_rules_data.i18n.discount_percentage || "Discount Percentage"}</label>
+                        <div class="nop-input-group">
+                            <input type="number" id="action_value" name="action_value" min="1" max="100" required value="${value || ""}">
+                            <span class="nop-input-addon">%</span>
+                        </div>
+                        <p class="description">${nop_rules_data.i18n.percentage_discount_desc || "Percentage off cart total"}</p>
+                    </div>
+                `);
+                break;
+
+            case "fixed_discount":
+                $actionFields.append(`
+                    <div class="nop-form-group">
+                        <label for="action_value">${nop_rules_data.i18n.discount_amount || "Discount Amount"}</label>
+                        <div class="nop-input-group">
+                            <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
+                            <input type="number" id="action_value" name="action_value" min="0.01" step="0.01" required value="${value || ""}">
+                        </div>
+                        <p class="description">${nop_rules_data.i18n.fixed_discount_desc || "Fixed amount off cart total"}</p>
+                    </div>
+                `);
+                break;
+
+            // Add more action types as needed
+        }
+    }
+
+    // Update condition fields based on condition type
+    function updateConditionFields(type, value, params) {
+        const conditionType = type || "";
+
+        // Clear existing fields
+        $conditionFields.empty();
+
+        if (!conditionType) {
+            return;
+        }
+
+        // Add appropriate fields based on condition type
+        switch (conditionType) {
+            case "cart_total":
+                $conditionFields.append(`
+                    <div class="nop-form-group">
+                        <label for="condition_value">${nop_rules_data.i18n.min_amount || "Minimum Cart Amount"}</label>
+                        <div class="nop-input-group">
+                            <span class="nop-input-addon">${nop_rules_data.currency_symbol || "$"}</span>
+                            <input type="number" id="condition_value" name="condition_value" min="0.01" step="0.01" required value="${value || ""}">
+                        </div>
+                        <p class="description">${nop_rules_data.i18n.min_amount_desc || "Minimum cart subtotal required"}</p>
+                    </div>
+                `);
+                break;
+
+            case "item_count":
+                $conditionFields.append(`
+                    <div class="nop-form-group">
+                        <label for="condition_value">${nop_rules_data.i18n.min_items || "Minimum Items"}</label>
+                        <input type="number" id="condition_value" name="condition_value" min="1" step="1" required value="${value || ""}">
+                        <p class="description">${nop_rules_data.i18n.min_items_desc || "Minimum number of items required"}</p>
+                    </div>
+                `);
+                break;
+
+            // Add more condition types as needed
+        }
+    }
+
+    // Update progress bar highlighting
+    function updateProgressBar(category) {
+        // Implementation depends on if you have a progress bar UI
+    }
+
+    // Check URL parameters for any specific actions
+    function checkUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const action = urlParams.get("action");
+        const ruleId = urlParams.get("rule_id");
+
+        if (action === "edit" && ruleId) {
+            // Find the rule data
+            $rulesTable
+                .find(`tr[data-rule-id="${ruleId}"] .nop-edit-rule`)
+                .trigger("click");
+        } else if (action === "add") {
+            openAddRuleModal();
+        }
+    }
+
+    // Save rule
+    function saveRule(e) {
+        e.preventDefault();
+
+        // Get form data
+        const ruleId = $("#rule_id").val();
+        const formData = {
+            id: ruleId ? Number.parseInt(ruleId, 10) : 0,
+            name: $("#rule_name").val(),
+            description: $("#rule_description").val(),
+            category: $("#rule_category").val(),
+            priority: Number.parseInt($("#rule_priority").val(), 10),
+            active: $("#rule_active").prop("checked"),
+            condition_type: $("#condition_type").val() || $("#rule_category").val(),
+            condition_value: $("#condition_value").val(),
+            condition_settings: {}, // Add any additional settings here
+            action_type: $("#action_type").val(),
+            action_value: $("#action_value").val(),
+            action_settings: {}, // Add any additional settings here
+        };
+
+        // Send AJAX request to save rule
+        $.ajax({
+            url: nop_rules_data.ajax_url,
+            type: "POST",
+            data: {
+                action: `${nop_rules_data.prefix}save_rule`,
+                nonce: nop_rules_data.nonce,
+                rule_data: JSON.stringify(formData),
+            },
+            success: (response) => {
+                if (response.success) {
+                    showNotice(nop_rules_data.i18n.save_success, "success");
+                    closeModal();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotice(
+                        response.data.message || nop_rules_data.i18n.error,
+                        "error",
+                    );
+                }
+            },
+            error: () => {
+                showNotice(nop_rules_data.i18n.error, "error");
+            },
+        });
+    }
+
+    // Confirm and delete a rule
+    function confirmDeleteRule(ruleId) {
+        if (confirm(nop_rules_data.i18n.confirm_delete)) {
+            deleteRule(ruleId);
+        }
+    }
+
+    // Delete a rule via AJAX
+    function deleteRule(ruleId) {
+        $.ajax({
+            url: nop_rules_data.ajax_url,
+            type: "POST",
+            data: {
+                action: `${nop_rules_data.prefix}delete_rule`,
+                nonce: nop_rules_data.nonce,
+                rule_id: ruleId,
+            },
+            success: (response) => {
+                if (response.success) {
+                    showNotice(nop_rules_data.i18n.delete_success, "success");
+                    $rulesTable.find(`tr[data-rule-id="${ruleId}"]`).fadeOut(function () {
+                        $(this).remove();
+                    });
+                } else {
+                    showNotice(
+                        response.data.message || nop_rules_data.i18n.error,
+                        "error",
+                    );
+                }
+            },
+            error: () => {
+                showNotice(nop_rules_data.i18n.error, "error");
+            },
+        });
+    }
+
+    // Toggle rule active state
+    function toggleRuleActive(ruleId, isActive) {
+        $.ajax({
+            url: nop_rules_data.ajax_url,
+            type: "POST",
+            data: {
+                action: `${nop_rules_data.prefix}toggle_rule`,
+                nonce: nop_rules_data.nonce,
+                rule_id: ruleId,
+                active: isActive ? 1 : 0,
+            },
+            success: (response) => {
+                if (response.success) {
+                    // Update UI
+                    const category = response.data.category || "";
+
+                    if (isActive && category) {
+                        // If we activated a rule with a category, highlight that category
+                        highlightActiveCategory(category);
+
+                        // Reload page after a short delay to update all rule states
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                } else {
+                    showNotice(
+                        response.data.message || nop_rules_data.i18n.error,
+                        "error",
+                    );
+                }
+            },
+            error: () => {
+                showNotice(nop_rules_data.i18n.error, "error");
+            },
+        });
+    }
+
     // Initialize category controls outside the modal
     function initCategoryControls() {
         // Create category selection controls if they don't exist
@@ -223,7 +547,7 @@
                 processedCount++;
                 checkCompletion();
             }
-        };
+        }
 
         // Show loading indicator
         showNotice("Updating rules...", "info");

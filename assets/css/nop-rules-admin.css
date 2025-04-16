@@ -96,6 +96,79 @@ tr.nop-inactive-category td {
 	padding-left: 11px;
 }
 
+/* Active category summary */
+.nop-active-category-summary {
+	background-color: #fff;
+	padding: 20px;
+	margin-bottom: 20px;
+	border-radius: 4px;
+	border-left: 4px solid #46b450;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.nop-active-category-summary h2 {
+	margin-top: 0;
+	color: #333;
+	font-size: 1.3em;
+	margin-bottom: 15px;
+}
+
+.nop-active-category-summary h3 {
+	margin-top: 0;
+	font-size: 1.1em;
+	color: #555;
+	margin-bottom: 10px;
+}
+
+.nop-active-rules-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.nop-active-rules-list li {
+	padding: 10px;
+	border-bottom: 1px solid #f0f0f0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.nop-active-rules-list li:last-child {
+	border-bottom: none;
+}
+
+.nop-rule-name {
+	font-weight: 600;
+	margin-right: 15px;
+	min-width: 200px;
+}
+
+.nop-rule-description {
+	color: #666;
+	flex-grow: 1;
+	font-style: italic;
+	margin-right: 15px;
+}
+
+.nop-rule-status {
+	text-align: center;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 4px 8px;
+}
+
+.nop-rule-status.active {
+	background-color: #edfaef;
+	color: #1e7e34;
+}
+
+.nop-rule-status.inactive {
+	background-color: #f8f9fa;
+	color: #6c757d;
+}
+
 /* Category progress bar */
 .nop-category-progress {
 	margin: 15px 0;
