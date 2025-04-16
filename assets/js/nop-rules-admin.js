@@ -12,6 +12,10 @@
     const $conditionFields = $("#condition_fields");
     const $actionFields = $("#action_fields");
     const $notice = $(".nop-rules-notice");
+    // Progress bar elements
+    const $progressSegments = $(".nop-progress-segment");
+    const $activeCategory = $("#nop-active-category");
+    const $categorySelect = $("#rule_category");
 
     // Initialize the admin UI
     function init() {
@@ -103,8 +107,7 @@
             $rulesTable.find("tbody").append($categoryHeader);
 
             // Append the rows with appropriate styling
-
-            for (const row in $rows) {
+            for (const $row of rows) {
                 if (!isCategoryActive) {
                     $row.addClass("nop-inactive-category");
                 }
@@ -199,57 +202,56 @@
         // Close modal
         $(".nop-modal-close, .nop-cancel-rule").on("click", closeModal);
 
-        // Submit rule form
+        // Handle form submission
         $ruleForm.on("submit", saveRule);
 
-        // Condition type change
-        $("#condition_type").on("change", updateConditionFields);
+        // Handle condition type change
+        $("#condition_type").on("change", function () {
+            updateConditionFields($(this).val());
+        });
 
-        // Action type change
-        $("#action_type").on("change", updateActionFields);
-
-        // Rule category change - automatically set the appropriate condition
+        // Handle rule category change - set condition type to match
         $("#rule_category").on("change", function () {
             const category = $(this).val();
-            if (category) {
-                // Map categories to condition types
-                switch (category) {
-                    case "cart_total":
-                        $("#condition_type").val("cart_total").trigger("change");
-                        break;
-                    case "item_count":
-                        $("#condition_type").val("item_count").trigger("change");
-                        break;
-                    case "specific_product":
-                        $("#condition_type").val("specific_product").trigger("change");
-                        break;
-                    case "product_count":
-                        $("#condition_type").val("product_count").trigger("change");
-                        break;
-                    case "custom":
-                        // For custom category, don't auto-select any condition
-                        break;
-                }
-            }
+            $("#condition_type").val(category).trigger("change");
+
+            // Update progress bar highlighting
+            updateProgressBar(category);
         });
 
-        // Close modal when clicking outside of content
-        $(window).on("click", (event) => {
-            if ($(event.target).is($modal)) {
-                closeModal();
-            }
+        // Handle category progress bar segment clicks
+        $(".nop-progress-segment").on("click", function () {
+            const category = $(this).data("category");
+
+            // Update select dropdown
+            $("#rule_category").val(category).trigger("change");
+
+            // Visual feedback
+            $(this).addClass("active").siblings().removeClass("active");
         });
 
-        // Category field suggestions
-        $("#rule_category").on("focus", () => {
-            // Get current categories in the table
+        // Update condition fields whenever the form is shown
+        $modal.on("shown", () => {
+            const category = $("#rule_category").val();
+            updateConditionFields(category || $("#condition_type").val());
+        });
+
+        // Handle action type change
+        $("#action_type").on("change", () => {
+            updateActionFields();
+        });
+
+        // Populate the category suggestions based on existing rules
+        $modal.on("show", () => {
             const categories = new Set();
-            $rulesTable.find("tbody tr").each(function () {
-                const $ruleDataInput = $(this).find(".nop-rule-data");
-                if ($ruleDataInput.length) {
+
+            // Gather categories from existing rules
+            $rulesTable.find(".nop-rule-data").each(function () {
+                const value = $(this).val();
+                if (value) {
                     try {
-                        const ruleData = JSON.parse($ruleDataInput.val());
-                        if (ruleData.category && ruleData.category !== "uncategorized") {
+                        const ruleData = JSON.parse(value);
+                        if (ruleData.category) {
                             categories.add(ruleData.category);
                         }
                     } catch (e) {
@@ -262,7 +264,7 @@
             if (!$("#category-suggestions").length) {
                 const $datalist = $("<datalist id='category-suggestions'></datalist>");
 
-                for (const category in categories) {
+                for (const category of categories) {
                     $datalist.append(`<option value="${category}">`);
                 }
 
@@ -278,6 +280,28 @@
         if (urlParams.has("updated")) {
             showNotice(nop_rules_data.i18n.save_success, "success");
         }
+    }
+
+    // Update the progress bar when category changes
+    function updateProgressBar(category) {
+        if (!category) return;
+
+        // Update highlighted segment
+        $progressSegments.removeClass("active");
+        $(`.nop-progress-segment[data-category="${category}"]`).addClass("active");
+
+        // Update active category label
+        let categoryLabel = category;
+
+        // Find the text label from the dropdown
+        $("#rule_category option").each(function () {
+            if ($(this).val() === category) {
+                categoryLabel = $(this).text();
+                return false;
+            }
+        });
+
+        $activeCategory.text(categoryLabel);
     }
 
     // Open modal for adding a new rule
@@ -315,6 +339,9 @@
         setTimeout(() => {
             populateConditionValues(ruleData);
             populateActionValues(ruleData);
+
+            // Update progress bar
+            updateProgressBar(ruleData.category || ruleData.condition_type);
         }, 100);
 
         $modal.show();
@@ -335,8 +362,8 @@
     }
 
     // Update condition fields based on selected condition type
-    function updateConditionFields() {
-        const conditionType = $("#condition_type").val();
+    function updateConditionFields(directCategory) {
+        const conditionType = directCategory || $("#condition_type").val();
         $conditionFields.empty();
 
         if (!conditionType) {
@@ -390,7 +417,7 @@
 
             case "product_count":
                 html = `
-                    <div class="nop-form-group"></div>
+                    <div class="nop-form-group">
                         <label for="product_id">${nop_rules_data.i18n.select_product}</label>
                         <select id="product_id" name="product_id" class="nop-product-select" required>
                             <option value="">${nop_rules_data.i18n.select_product}</option>
@@ -407,12 +434,23 @@
 
         $conditionFields.html(html);
 
-        // Initialize Select2 for product dropdowns
-        $(".nop-product-select").select2({
-            width: "100%",
-            placeholder: nop_rules_data.i18n.select_product,
-            data: nop_rules_data.products,
-        });
+        // Initialize Select2 for product dropdowns - Fix: use proper selector and ensure products data is loaded
+        if (conditionType === "specific_product" || conditionType === "product_count") {
+            const $productSelect = $conditionFields.find(".nop-product-select");
+
+            // Make sure we detach any existing Select2 instances first
+            if ($productSelect.hasClass("select2-hidden-accessible")) {
+                $productSelect.select2("destroy");
+            }
+
+            // Initialize Select2 with proper data
+            $productSelect.select2({
+                width: "100%",
+                placeholder: nop_rules_data.i18n.select_product,
+                data: nop_rules_data.products || [],
+                dropdownParent: $modal // Fix: attach dropdown to modal to prevent z-index issues
+            });
+        }
     }
 
     // Update action fields based on selected action type

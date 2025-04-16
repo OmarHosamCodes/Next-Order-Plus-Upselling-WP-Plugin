@@ -291,6 +291,49 @@ class NOP_Rules_Admin extends NOP_Base
                             </p>
                         </div>
 
+                        <!-- Category Progress Bar -->
+                        <div class="nop-form-group nop-category-progress">
+                            <label><?php echo esc_html__('Active Category', 'next-order-plus'); ?></label>
+                            <div class="nop-progress-container">
+                                <?php
+                                // Get active category
+                                $active_category = '';
+                                $categories = array(
+                                    'cart_total' => __('Cart Total', 'next-order-plus'),
+                                    'item_count' => __('Item Count', 'next-order-plus'),
+                                    'specific_product' => __('Specific Product', 'next-order-plus'),
+                                    'product_count' => __('Product Count', 'next-order-plus'),
+                                    'custom' => __('Custom', 'next-order-plus')
+                                );
+
+                                foreach ($rules as $rule) {
+                                    if ($rule->is_active()) {
+                                        $active_category = $rule->get_category();
+                                        break;
+                                    }
+                                }
+                                
+                                // Display the active category name
+                                $active_label = !empty($active_category) && isset($categories[$active_category]) 
+                                    ? $categories[$active_category] 
+                                    : __('None', 'next-order-plus');
+                                
+                                // Generate the progress bar
+                                echo '<div class="nop-progress-bar">';
+                                foreach ($categories as $cat_key => $cat_label) {
+                                    $is_active = ($active_category === $cat_key);
+                                    $class = $is_active ? 'active' : '';
+                                    echo '<div class="nop-progress-segment ' . $class . '" data-category="' . esc_attr($cat_key) . '">' . esc_html($cat_label) . '</div>';
+                                }
+                                echo '</div>';
+                                ?>
+                                <p class="description">
+                                    <?php echo esc_html__('Currently active category:', 'next-order-plus'); ?> 
+                                    <strong id="nop-active-category"><?php echo esc_html($active_label); ?></strong>
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="nop-form-group">
                             <label>
                                 <input type="checkbox" id="rule_active" name="rule_active" checked>
@@ -307,10 +350,11 @@ class NOP_Rules_Admin extends NOP_Base
                         <textarea id="rule_description" name="rule_description"></textarea>
                     </div>
 
-                    <div class="nop-form-row">
+                    <!-- Hide the condition type selection as we'll use category directly -->
+                    <div class="nop-form-row" style="display: none;">
                         <div class="nop-form-group">
                             <label for="condition_type"><?php echo esc_html__('Condition', 'next-order-plus'); ?></label>
-                            <select id="condition_type" name="condition_type" required>
+                            <select id="condition_type" name="condition_type">
                                 <option value=""><?php echo esc_html__('Select a condition', 'next-order-plus'); ?></option>
                                 <?php foreach ($this->rules_manager->get_condition_types() as $type => $label): ?>
                                     <option value="<?php echo esc_attr($type); ?>"><?php echo esc_html($label); ?></option>
