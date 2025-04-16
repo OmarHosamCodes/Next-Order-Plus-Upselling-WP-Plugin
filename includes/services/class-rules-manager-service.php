@@ -326,593 +326,501 @@ class NOP_Rules_Manager extends NOP_Base
     }
 
     /**
-     * Calculate total discount from all applicable rules
+     * Calculate all applicable discounts for the cart
      *
      * @param mixed $cart WooCommerce cart object
-     * @return array Discounts with details
+     * @return array Array of discount data with amounts and rule information
      */
     public function calculate_discounts($cart): array
     {
-        $this->set_cart($cart);
-        $rules = $this->get_rules(true);
+        $this->cart = $cart;
         $discounts = [];
-        $this->applied_rules = [];
+        $active_rules = $this->get_rules(true); // Only get active rules
 
-        foreach ($rules as $rule) {
-            if ($this->check_condition($rule)) {
-                $discount = $this->apply_action($rule);
+        if (empty($active_rules)) {
+            $this->log('No active rules found for discount calculation');
+            return [];
+        }
 
-                if ($discount['amount'] > 0 || !empty($discount['free_shipping'])) {
-                    $discounts[] = $discount;
-                    $this->applied_rules[$rule->get_id()] = $rule;
+        // Get active category (if any)
+        $active_category = '';
 
-                    // Check if rule should prevent others from applying
-                    if (!empty($discount['exclusive'])) {
-                        break;
-                    }
-                }
+        foreach ($active_rules as $rule) {
+            if ($rule->is_active() && !empty($rule->get_category())) {
+                $active_category = $rule->get_category();
+                break;
             }
         }
 
-        // Check for conflicts
-        $this->detect_conflicts($discounts);
+        // If we have an active category, only evaluate rules in that category
+        if (!empty($active_category)) {
+            $category_rules = [];
 
-        // Store applied rules in session for reference
-        if (function_exists('WC') && WC()->session) {
-            WC()->session->set($this->prefix . 'applied_rules', array_keys($this->applied_rules));
+            foreach ($active_rules as $rule) {
+                if ($rule->get_category() === $active_category) {
+                    $category_rules[] = $rule;
+                }
+            }
+
+            // Replace active rules with only those in the active category
+            $active_rules = $category_rules;
+        }
+
+        // Track which rules have been applied
+        $this->applied_rules = [];
+
+        // Evaluate each rule
+        foreach ($active_rules as $rule) {
+            $discount_data = $this->evaluate_rule($rule);
+
+            if (!empty($discount_data) && isset($discount_data['amount']) && $discount_data['amount'] > 0) {
+                $discounts[] = $discount_data;
+                $this->applied_rules[] = $rule->get_id();
+
+            }
         }
 
         return $discounts;
     }
 
     /**
-     * Detect conflicts between applied rules
+     * Evaluate a single rule and return applicable discount
      *
-     * @param array $discounts Applied discounts
-     * @return void
+     * @param NOP_Rule $rule Rule to evaluate
+     * @return array|null Discount data if rule conditions are met, null otherwise
      */
-    private function detect_conflicts(array &$discounts): void
+    private function evaluate_rule($rule): ?array
     {
-        $conflict_groups = [
-            'percentage' => [],
-            'fixed' => [],
-            'free_product' => [],
-            'shipping' => []
-        ];
-
-        // Group discounts by type
-        foreach ($discounts as $index => $discount) {
-            $action_type = $discount['action_type'];
-
-            switch ($action_type) {
-                case 'percentage_discount':
-                    $conflict_groups['percentage'][] = $index;
-                    break;
-
-                case 'fixed_discount':
-                    $conflict_groups['fixed'][] = $index;
-                    break;
-
-                case 'free_shipping':
-                    $conflict_groups['shipping'][] = $index;
-                    break;
-
-                case 'cheapest_free':
-                case 'most_expensive_free':
-                case 'nth_cheapest_free':
-                case 'nth_expensive_free':
-                    $conflict_groups['free_product'][] = $index;
-                    break;
-            }
-        }
-
-        // Handle percentage conflicts - keep highest
-        if (count($conflict_groups['percentage']) > 1) {
-            $max_percentage = 0;
-            $max_index = -1;
-
-            foreach ($conflict_groups['percentage'] as $index) {
-                $rule_id = $discounts[$index]['rule_id'];
-                $rule = $this->applied_rules[$rule_id];
-                $value = $rule->get_action_value();
-
-                if ($value > $max_percentage) {
-                    $max_percentage = $value;
-                    $max_index = $index;
-                }
-            }
-
-            // Keep only the highest percentage discount
-            foreach ($conflict_groups['percentage'] as $index) {
-                if ($index !== $max_index) {
-                    $this->log("Conflict detected: Removing percentage discount #{$discounts[$index]['rule_id']} in favor of #{$discounts[$max_index]['rule_id']}");
-                    $discounts[$index]['amount'] = 0;
-                    $discounts[$index]['conflict'] = true;
-                }
-            }
-        }
-
-        // Handle free product conflicts - keep highest discount amount
-        if (count($conflict_groups['free_product']) > 1) {
-            $max_amount = 0;
-            $max_index = -1;
-
-            foreach ($conflict_groups['free_product'] as $index) {
-                $amount = $discounts[$index]['amount'];
-
-                if ($amount > $max_amount) {
-                    $max_amount = $amount;
-                    $max_index = $index;
-                }
-            }
-
-            // Keep only the highest free product discount
-            foreach ($conflict_groups['free_product'] as $index) {
-                if ($index !== $max_index) {
-                    $this->log("Conflict detected: Removing free product discount #{$discounts[$index]['rule_id']} in favor of #{$discounts[$max_index]['rule_id']}");
-                    $discounts[$index]['amount'] = 0;
-                    $discounts[$index]['conflict'] = true;
-                }
-            }
-        }
-    }
-
-    /**
-     * Get applied rules for current session
-     *
-     * @return array Applied rule IDs
-     */
-    public function get_applied_rules(): array
-    {
-        if (!empty($this->applied_rules)) {
-            return array_keys($this->applied_rules);
-        }
-
-        // Try to get from session
-        if (function_exists('WC') && WC()->session) {
-            $applied_rules = WC()->session->get($this->prefix . 'applied_rules', []);
-            return $applied_rules;
-        }
-
-        return [];
-    }
-
-    /**
-     * Check if a rule condition is met
-     *
-     * @param NOP_Rule $rule Rule to check
-     * @return bool Whether condition is met
-     */
-    private function check_condition(NOP_Rule $rule): bool
-    {
-        if (!$this->cart) {
-            return false;
+        // Skip inactive rules
+        if (!$rule->is_active()) {
+            return null;
         }
 
         $condition_type = $rule->get_condition_type();
         $condition_value = $rule->get_condition_value();
         $condition_params = $rule->get_condition_params();
 
-        switch ($condition_type) {
+        // Check if condition is met
+        $condition_met = $this->evaluate_condition($condition_type, $condition_value, $condition_params);
+
+        if (!$condition_met) {
+            return null;
+        }
+
+        // Condition is met, calculate applicable discount
+        $action_type = $rule->get_action_type();
+        $action_value = $rule->get_action_value();
+        $action_params = $rule->get_action_params();
+
+        return $this->calculate_action_discount($action_type, $action_value, $action_params, [
+            'rule_id' => $rule->get_id(),
+            'rule_name' => $rule->get_name(),
+            'category' => $rule->get_category()
+        ]);
+    }
+
+    /**
+     * Evaluate condition to determine if it's met
+     *
+     * @param string $type Condition type
+     * @param mixed $value Condition value
+     * @param array $params Additional parameters
+     * @return bool Whether condition is met
+     */
+    private function evaluate_condition($type, $value, $params = []): bool
+    {
+        if (empty($this->cart)) {
+            return false;
+        }
+
+        switch ($type) {
             case 'cart_total':
-                return $this->check_cart_total_condition($condition_value);
+                return $this->evaluate_cart_total_condition($value);
 
             case 'item_count':
-                return $this->check_item_count_condition($condition_value);
+                return $this->evaluate_item_count_condition($value);
 
             case 'specific_product':
-                return $this->check_specific_product_condition($condition_value, $condition_params);
+                return $this->evaluate_specific_product_condition($value, $params);
 
             case 'product_count':
-                return $this->check_product_count_condition($condition_value, $condition_params);
+                return $this->evaluate_product_count_condition($value, $params);
+
             default:
                 // Allow custom conditions via filter
                 return apply_filters(
-                    $this->prefix . 'check_custom_condition',
+                    $this->prefix . 'evaluate_condition',
                     false,
-                    $condition_type,
-                    $condition_value,
-                    $condition_params,
+                    $type,
+                    $value,
+                    $params,
                     $this->cart
                 );
         }
     }
 
     /**
-     * Check if cart total meets condition
+     * Calculate discount amount based on action type
      *
-     * @param float $min_total Minimum cart total
-     * @return bool Whether condition is met
-     */
-    private function check_cart_total_condition(float $min_total): bool
-    {
-        $cart_total = 0;
-
-        if (method_exists($this->cart, 'get_cart_contents_total')) {
-            // Classic Cart
-            $cart_total = (float) $this->cart->get_cart_contents_total();
-        } elseif (method_exists($this->cart, 'get_totals')) {
-            // Block Cart
-            $totals = $this->cart->get_totals();
-            $cart_total = isset($totals['total']) ? (float) $totals['total'] : 0;
-        }
-
-        $this->log("Cart total condition: {$cart_total} >= {$min_total}");
-        return $cart_total >= $min_total;
-    }
-
-    /**
-     * Check if item count meets condition
-     *
-     * @param int $min_count Minimum item count
-     * @return bool Whether condition is met
-     */
-    private function check_item_count_condition(int $min_count): bool
-    {
-        $item_count = 0;
-
-        if (method_exists($this->cart, 'get_cart_contents_count')) {
-            // Classic Cart
-            $item_count = (int) $this->cart->get_cart_contents_count();
-        } elseif (method_exists($this->cart, 'get_items_count')) {
-            // Block Cart
-            $item_count = (int) $this->cart->get_items_count();
-        }
-
-        $this->log("Item count condition: {$item_count} >= {$min_count}");
-        return $item_count >= $min_count;
-    }
-
-    /**
-     * Check if specific product is in cart
-     *
-     * @param string|int $product_id Product ID
+     * @param string $type Action type
+     * @param mixed $value Action value
      * @param array $params Additional parameters
-     * @return bool Whether condition is met
+     * @param array $rule_data Rule metadata
+     * @return array Discount data with amount and metadata
      */
-    private function check_specific_product_condition($product_id, array $params): bool
+    private function calculate_action_discount($type, $value, $params = [], $rule_data = []): array
     {
-        $cart_items = [];
-
-        if (method_exists($this->cart, 'get_cart')) {
-            // Classic Cart
-            $cart_items = $this->cart->get_cart();
-        } elseif (method_exists($this->cart, 'get_items')) {
-            // Block Cart
-            $cart_items = $this->cart->get_items();
+        if (empty($this->cart)) {
+            return ['amount' => 0, 'rule_name' => $rule_data['rule_name'] ?? ''];
         }
 
-        foreach ($cart_items as $cart_item) {
-            $item_product_id = 0;
-
-            if (isset($cart_item['product_id'])) {
-                // Classic Cart
-                $item_product_id = $cart_item['product_id'];
-            } elseif (is_object($cart_item) && method_exists($cart_item, 'get_id')) {
-                // Block Cart
-                $item_product_id = $cart_item->get_id();
-            }
-
-            if ($item_product_id == $product_id) {
-                $this->log("Specific product condition met: Product {$product_id} found in cart");
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Check if specific product count meets condition
-     *
-     * @param int $min_count Minimum count
-     * @param array $params Additional parameters with product_id
-     * @return bool Whether condition is met
-     */
-    private function check_product_count_condition(int $min_count, array $params): bool
-    {
-        if (empty($params['product_id'])) {
-            return false;
-        }
-
-        $product_id = $params['product_id'];
-        $product_count = 0;
-        $cart_items = [];
-
-        if (method_exists($this->cart, 'get_cart')) {
-            // Classic Cart
-            $cart_items = $this->cart->get_cart();
-        } elseif (method_exists($this->cart, 'get_items')) {
-            // Block Cart
-            $cart_items = $this->cart->get_items();
-        }
-
-        foreach ($cart_items as $cart_item) {
-            $item_product_id = 0;
-            $quantity = 0;
-
-            if (isset($cart_item['product_id']) && isset($cart_item['quantity'])) {
-                // Classic Cart
-                $item_product_id = $cart_item['product_id'];
-                $quantity = $cart_item['quantity'];
-            } elseif (is_object($cart_item)) {
-                // Block Cart
-                if (method_exists($cart_item, 'get_id')) {
-                    $item_product_id = $cart_item->get_id();
-                }
-                if (method_exists($cart_item, 'get_quantity')) {
-                    $quantity = $cart_item->get_quantity();
-                }
-            }
-
-            if ($item_product_id == $product_id) {
-                $product_count += $quantity;
-            }
-        }
-
-        $this->log("Product count condition: {$product_count} >= {$min_count} for product {$product_id}");
-        return $product_count >= $min_count;
-    }
-
-    /**
-     * Calculate percentage discount based on cart total
-     *
-     * @param float $percentage Percentage value (0-100)
-     * @return float Discount amount
-     */
-    private function calculate_percentage_discount(float $percentage): float
-    {
-        $cart_total = 0;
-
-        if (method_exists($this->cart, 'get_cart_contents_total')) {
-            // Classic Cart
-            $cart_total = (float) $this->cart->get_cart_contents_total();
-        } elseif (method_exists($this->cart, 'get_totals')) {
-            // Block Cart
-            $totals = $this->cart->get_totals();
-            $cart_total = isset($totals['total']) ? (float) $totals['total'] : 0;
-        }
-
-        $discount = ($cart_total * $percentage) / 100;
-        $this->log("Percentage discount: {$percentage}% of {$cart_total} = {$discount}");
-
-        return $discount;
-    }
-
-    /**
-     * Calculate discount for cheapest item in cart
-     *
-     * @return float Discount amount
-     */
-    private function calculate_cheapest_item_discount(): float
-    {
-        $prices = $this->get_item_prices();
-
-        if (empty($prices)) {
-            return 0;
-        }
-
-        // Sort prices to get cheapest first
-        sort($prices);
-        $discount = $prices[0];
-
-        $this->log("Cheapest item discount: {$discount}");
-        return $discount;
-    }
-
-    /**
-     * Calculate discount for most expensive item in cart
-     *
-     * @return float Discount amount
-     */
-    private function calculate_most_expensive_item_discount(): float
-    {
-        $prices = $this->get_item_prices();
-
-        if (empty($prices)) {
-            return 0;
-        }
-
-        // Sort prices to get most expensive last
-        sort($prices);
-        $discount = end($prices);
-
-        $this->log("Most expensive item discount: {$discount}");
-        return $discount;
-    }
-
-    /**
-     * Calculate discount for nth cheapest item in cart
-     *
-     * @param int $n Position (1-based)
-     * @return float Discount amount
-     */
-    private function calculate_nth_cheapest_item_discount(int $n): float
-    {
-        $prices = $this->get_item_prices();
-
-        if (empty($prices) || count($prices) < $n) {
-            return 0;
-        }
-
-        // Sort prices to get cheapest first
-        sort($prices);
-        $index = $n - 1; // Convert to 0-based index
-        $discount = $prices[$index];
-
-        $this->log("Nth cheapest item discount (n={$n}): {$discount}");
-        return $discount;
-    }
-
-    /**
-     * Calculate discount for nth most expensive item in cart
-     *
-     * @param int $n Position (1-based)
-     * @return float Discount amount
-     */
-    private function calculate_nth_expensive_item_discount(int $n): float
-    {
-        $prices = $this->get_item_prices();
-
-        if (empty($prices) || count($prices) < $n) {
-            return 0;
-        }
-
-        // Sort prices to get most expensive first
-        rsort($prices);
-        $index = $n - 1; // Convert to 0-based index
-        $discount = $prices[$index];
-
-        $this->log("Nth most expensive item discount (n={$n}): {$discount}");
-        return $discount;
-    }
-
-    /**
-     * Get all item prices from cart
-     *
-     * @return array Array of individual item prices
-     */
-    private function get_item_prices(): array
-    {
-        $prices = [];
-        $cart_items = [];
-
-        if (method_exists($this->cart, 'get_cart')) {
-            // Classic Cart
-            $cart_items = $this->cart->get_cart();
-        } elseif (method_exists($this->cart, 'get_items')) {
-            // Block Cart
-            $cart_items = $this->cart->get_items();
-        }
-
-        foreach ($cart_items as $cart_item) {
-            if (!$cart_item) {
-                continue;
-            }
-
-            // Skip bundled items
-            if (isset($cart_item['bundled_by'])) {
-                continue;
-            }
-
-            $product_price = 0;
-            $quantity = 0;
-
-            if (isset($cart_item['data']) && method_exists($cart_item['data'], 'get_price')) {
-                // Classic Cart
-                $product_price = (float) $cart_item['data']->get_price();
-                $quantity = isset($cart_item['quantity']) ? (int) $cart_item['quantity'] : 1;
-            } elseif (is_object($cart_item)) {
-                // Block Cart
-                if (method_exists($cart_item, 'get_product') && $cart_item->get_product()) {
-                    $product = $cart_item->get_product();
-                    if (method_exists($product, 'get_price')) {
-                        $product_price = (float) $product->get_price();
-                    }
-                }
-                if (method_exists($cart_item, 'get_quantity')) {
-                    $quantity = (int) $cart_item->get_quantity();
-                }
-            }
-
-            if ($product_price > 0) {
-                for ($i = 0; $i < $quantity; $i++) {
-                    $prices[] = $product_price;
-                }
-            }
-        }
-
-        return $prices;
-    }
-
-    /**
-     * Apply rule action and get discount amount
-     *
-     * @param NOP_Rule $rule Rule to apply
-     * @return array Discount details
-     */
-    private function apply_action(NOP_Rule $rule): array
-    {
-        $action_type = $rule->get_action_type();
-        $action_value = $rule->get_action_value();
-        $action_params = $rule->get_action_params();
-        $discount = 0;
-
-        $result = [
-            'rule_id' => $rule->get_id(),
-            'rule_name' => $rule->get_name(),
-            'action_type' => $action_type,
+        $discount = [
             'amount' => 0,
-            'label' => $rule->get_name(),
-            'exclusive' => !empty($action_params['exclusive'])
+            'rule_id' => $rule_data['rule_id'] ?? 0,
+            'rule_name' => $rule_data['rule_name'] ?? __('Promotion', 'next-order-plus'),
+            'type' => $type,
+            'free_shipping' => false,
+            'conflict' => false,
         ];
 
-        switch ($action_type) {
+        switch ($type) {
             case 'percentage_discount':
-                $discount = $this->calculate_percentage_discount($action_value);
-                $result['amount'] = $discount;
-                $result['label'] = sprintf(__('Discount: %s (%s%%)', 'next-order-plus'), $rule->get_name(), $action_value);
+                $discount['amount'] = $this->calculate_percentage_discount($value);
                 break;
 
             case 'fixed_discount':
-                $discount = (float) $action_value;
-                $result['amount'] = $discount;
-                $result['label'] = sprintf(__('Discount: %s', 'next-order-plus'), $rule->get_name());
+                $discount['amount'] = min((float) $value, $this->get_cart_subtotal());
                 break;
 
             case 'free_shipping':
-                $result['amount'] = 0;  // Handled separately
-                $result['free_shipping'] = true;
-                $result['label'] = sprintf(__('Free Shipping: %s', 'next-order-plus'), $rule->get_name());
+                $discount['free_shipping'] = true;
                 break;
 
             case 'cheapest_free':
-                $discount = $this->calculate_cheapest_item_discount();
-                $result['amount'] = $discount;
-                $result['label'] = sprintf(__('Free Item: %s', 'next-order-plus'), $rule->get_name());
+                $discount['amount'] = $this->calculate_cheapest_free_discount();
                 break;
 
             case 'most_expensive_free':
-                $discount = $this->calculate_most_expensive_item_discount();
-                $result['amount'] = $discount;
-                $result['label'] = sprintf(__('Free Item: %s', 'next-order-plus'), $rule->get_name());
+                $discount['amount'] = $this->calculate_most_expensive_free_discount();
                 break;
 
             case 'nth_cheapest_free':
-                $n = isset($action_params['n']) ? (int) $action_params['n'] : 1;
-                $discount = $this->calculate_nth_cheapest_item_discount($n);
-                $result['amount'] = $discount;
-                $result['label'] = sprintf(__('Free Item: %s', 'next-order-plus'), $rule->get_name());
+                $position = isset($params['position']) ? (int) $params['position'] : 1;
+                $discount['amount'] = $this->calculate_nth_cheapest_free_discount($position);
                 break;
 
             case 'nth_expensive_free':
-                $n = isset($action_params['n']) ? (int) $action_params['n'] : 1;
-                $discount = $this->calculate_nth_expensive_item_discount($n);
-                $result['amount'] = $discount;
-                $result['label'] = sprintf(__('Free Item: %s', 'next-order-plus'), $rule->get_name());
+                $position = isset($params['position']) ? (int) $params['position'] : 1;
+                $discount['amount'] = $this->calculate_nth_expensive_free_discount($position);
                 break;
 
             default:
                 // Allow custom actions via filter
-                $custom_result = apply_filters(
-                    $this->prefix . 'apply_custom_action',
-                    [
-                        'amount' => 0,
-                        'label' => $rule->get_name()
-                    ],
-                    $action_type,
-                    $action_value,
-                    $action_params,
-                    $this->cart
+                $custom_discount = apply_filters(
+                    $this->prefix . 'calculate_action_discount',
+                    0,
+                    $type,
+                    $value,
+                    $params,
+                    $this->cart,
+                    $rule_data
                 );
-
-                if (is_array($custom_result)) {
-                    $result = array_merge($result, $custom_result);
-                }
+                $discount['amount'] = is_numeric($custom_discount) ? (float) $custom_discount : 0;
         }
 
-        $this->log("Rule '{$rule->get_name()}' applied with action '{$action_type}', discount: {$result['amount']}");
-        return $result;
+        return $discount;
+    }
+
+    /**
+     * Evaluate cart total condition
+     *
+     * @param float $min_amount Minimum cart amount
+     * @return bool Whether condition is met
+     */
+    private function evaluate_cart_total_condition($min_amount): bool
+    {
+        $cart_total = $this->get_cart_subtotal();
+        return $cart_total >= (float) $min_amount;
+    }
+
+    /**
+     * Evaluate item count condition
+     *
+     * @param int $min_items Minimum number of items
+     * @return bool Whether condition is met
+     */
+    private function evaluate_item_count_condition($min_items): bool
+    {
+        $item_count = $this->get_cart_item_count();
+        return $item_count >= (int) $min_items;
+    }
+
+    /**
+     * Evaluate specific product condition
+     *
+     * @param int|string $product_id Product ID
+     * @param array $params Additional parameters
+     * @return bool Whether condition is met
+     */
+    private function evaluate_specific_product_condition($product_id, $params = []): bool
+    {
+        $min_quantity = isset($params['min_quantity']) ? (int) $params['min_quantity'] : 1;
+
+        // Get cart contents
+        $cart_items = $this->get_cart_items();
+        $product_quantity = 0;
+
+        foreach ($cart_items as $item) {
+            $item_product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+            $item_variation_id = isset($item['variation_id']) ? $item['variation_id'] : 0;
+
+            if ($item_product_id == $product_id || ($item_variation_id > 0 && $item_variation_id == $product_id)) {
+                $product_quantity += $item['quantity'];
+            }
+        }
+
+        return $product_quantity >= $min_quantity;
+    }
+
+    /**
+     * Evaluate product count condition
+     *
+     * @param int $min_products Minimum unique products
+     * @param array $params Additional parameters
+     * @return bool Whether condition is met
+     */
+    private function evaluate_product_count_condition($min_products, $params = []): bool
+    {
+        // Count unique products in cart
+        $cart_items = $this->get_cart_items();
+        $unique_products = [];
+
+        foreach ($cart_items as $item) {
+            $product_id = isset($item['product_id']) ? $item['product_id'] : 0;
+            if ($product_id > 0 && !in_array($product_id, $unique_products)) {
+                $unique_products[] = $product_id;
+            }
+        }
+
+        return count($unique_products) >= (int) $min_products;
+    }
+
+    /**
+     * Calculate percentage discount
+     *
+     * @param float $percentage Percentage value
+     * @return float Discount amount
+     */
+    private function calculate_percentage_discount($percentage): float
+    {
+        $subtotal = $this->get_cart_subtotal();
+        $percentage = min(100, max(0, (float) $percentage));
+        return $subtotal * ($percentage / 100);
+    }
+
+    /**
+     * Calculate discount for cheapest free item
+     *
+     * @return float Discount amount
+     */
+    private function calculate_cheapest_free_discount(): float
+    {
+        $cart_items = $this->get_cart_items();
+        $cheapest_price = PHP_FLOAT_MAX;
+
+        foreach ($cart_items as $item) {
+            $price = isset($item['line_subtotal']) && isset($item['quantity']) && $item['quantity'] > 0
+                ? $item['line_subtotal'] / $item['quantity']
+                : PHP_FLOAT_MAX;
+
+            if ($price < $cheapest_price) {
+                $cheapest_price = $price;
+            }
+        }
+
+        return $cheapest_price !== PHP_FLOAT_MAX ? $cheapest_price : 0;
+    }
+
+    /**
+     * Calculate discount for most expensive free item
+     *
+     * @return float Discount amount
+     */
+    private function calculate_most_expensive_free_discount(): float
+    {
+        $cart_items = $this->get_cart_items();
+        $most_expensive = 0;
+
+        foreach ($cart_items as $item) {
+            $price = isset($item['line_subtotal']) && isset($item['quantity']) && $item['quantity'] > 0
+                ? $item['line_subtotal'] / $item['quantity']
+                : 0;
+
+            if ($price > $most_expensive) {
+                $most_expensive = $price;
+            }
+        }
+
+        return $most_expensive;
+    }
+
+    /**
+     * Calculate discount for nth cheapest free item
+     *
+     * @param int $position Position (1-based)
+     * @return float Discount amount
+     */
+    private function calculate_nth_cheapest_free_discount($position = 1): float
+    {
+        $cart_items = $this->get_cart_items();
+        $prices = [];
+
+        foreach ($cart_items as $item) {
+            if (isset($item['line_subtotal']) && isset($item['quantity']) && $item['quantity'] > 0) {
+                $unit_price = $item['line_subtotal'] / $item['quantity'];
+
+                // Add one entry per quantity
+                for ($i = 0; $i < $item['quantity']; $i++) {
+                    $prices[] = $unit_price;
+                }
+            }
+        }
+
+        // Sort prices low to high
+        sort($prices);
+
+        // Adjust position to 0-based
+        $index = $position - 1;
+
+        // Return price at requested position if it exists
+        return isset($prices[$index]) ? $prices[$index] : 0;
+    }
+
+    /**
+     * Calculate discount for nth most expensive free item
+     *
+     * @param int $position Position (1-based)
+     * @return float Discount amount
+     */
+    private function calculate_nth_expensive_free_discount($position = 1): float
+    {
+        $cart_items = $this->get_cart_items();
+        $prices = [];
+
+        foreach ($cart_items as $item) {
+            if (isset($item['line_subtotal']) && isset($item['quantity']) && $item['quantity'] > 0) {
+                $unit_price = $item['line_subtotal'] / $item['quantity'];
+
+                // Add one entry per quantity
+                for ($i = 0; $i < $item['quantity']; $i++) {
+                    $prices[] = $unit_price;
+                }
+            }
+        }
+
+        // Sort prices high to low
+        rsort($prices);
+
+        // Adjust position to 0-based
+        $index = $position - 1;
+
+        // Return price at requested position if it exists
+        return isset($prices[$index]) ? $prices[$index] : 0;
+    }
+
+    /**
+     * Get cart subtotal
+     *
+     * @return float Cart subtotal
+     */
+    private function get_cart_subtotal(): float
+    {
+        if (!$this->cart) {
+            return 0;
+        }
+
+        // Standard WooCommerce cart
+        if (method_exists($this->cart, 'get_subtotal')) {
+            return (float) $this->cart->get_subtotal();
+        }
+
+        // Store API cart
+        if (method_exists($this->cart, 'get_subtotal')) {
+            return (float) $this->cart->get_subtotal();
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get cart item count
+     *
+     * @return int Number of items in cart
+     */
+    private function get_cart_item_count(): int
+    {
+        if (!$this->cart) {
+            return 0;
+        }
+
+        // Standard WooCommerce cart
+        if (method_exists($this->cart, 'get_cart_contents_count')) {
+            return (int) $this->cart->get_cart_contents_count();
+        }
+
+        // Store API cart
+        if (method_exists($this->cart, 'get_items_count')) {
+            return (int) $this->cart->get_items_count();
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get cart items standardized format
+     *
+     * @return array Cart items
+     */
+    private function get_cart_items(): array
+    {
+        if (!$this->cart) {
+            return [];
+        }
+
+        // Standard WooCommerce cart
+        if (method_exists($this->cart, 'get_cart')) {
+            return $this->cart->get_cart();
+        }
+
+        // Store API cart
+        if (method_exists($this->cart, 'get_items')) {
+            $items = $this->cart->get_items();
+            $formatted_items = [];
+
+            foreach ($items as $item) {
+                $formatted_items[] = [
+                    'product_id' => $item->get_id(),
+                    'variation_id' => $item->get_variation_id(),
+                    'quantity' => $item->get_quantity(),
+                    'line_subtotal' => $item->get_subtotal(),
+                    'data' => $item
+                ];
+            }
+
+            return $formatted_items;
+        }
+
+        return [];
+    }
+
+    /**
+     * Get applied rules for current session
+     * 
+     * @return array IDs of applied rules
+     */
+    public function get_applied_rules(): array
+    {
+        return $this->applied_rules;
     }
 
     /**

@@ -110,6 +110,17 @@ class NOP_Plugin
     }
 
     /**
+     * Get access to the rules manager instance
+     *
+     * @since 1.1.0
+     * @return NOP\Services\NOP_Rules_Manager|null Rules manager instance
+     */
+    public function get_rules_manager()
+    {
+        return $this->rules_manager;
+    }
+
+    /**
      * Initialize service classes
      *
      * Creates instances of all required services used by the plugin
@@ -133,8 +144,10 @@ class NOP_Plugin
             define('NOP_DEBUG_RUNTIME', (bool) $options['debug_mode']);
         }
 
-        // Core services
+        // Core services - initialize rules manager first
         $this->rules_manager = new NOP\Services\NOP_Rules_Manager($this->logger);
+
+        // Initialize other services
         $this->discount_service = new NOP\Services\NOP_Discount_Service($this->logger, $this->admin_service);
         $this->assets_service = new NOP\Services\NOP_Assets_Service($this->logger);
         $this->cart_service = new NOP\Services\NOP_Cart_Service(
@@ -184,69 +197,36 @@ class NOP_Plugin
 
         // Block Cart and Checkout compatibility hooks
         add_action('woocommerce_store_api_cart_update_customer_from_request', [$this->cart_service, 'apply_cart_discount']);
-        add_action('woocommerce_store_api_cart_update_order_from_request', [$this->cart_service, 'apply_cart_discount']);
-        add_action('woocommerce_store_api_cart_items_updated', [$this->cart_service, 'apply_cart_discount']);
-        add_action('woocommerce_store_api_checkout_update_order_meta', [$this->cart_service, 'apply_cart_discount']);
 
-        // Mini cart hooks
-        add_action('wp_ajax_update_mini_cart_discount', [$this->cart_service, 'update_mini_cart_discount']);
-        add_action('wp_ajax_nopriv_update_mini_cart_discount', [$this->cart_service, 'update_mini_cart_discount']);
-        add_filter('woocommerce_add_to_cart_fragments', [$this->cart_service, 'add_mini_cart_discount_fragment']);
-        add_action('woocommerce_mini_cart_contents', [$this->cart_service, 'display_mini_cart_discount'], 99);
-
-        // Shipping and coupon hooks
-        add_filter('woocommerce_package_rates', [$this->cart_service, 'remove_free_shipping_when_discount_applied'], 10, 2);
+        // Handle coupon validation and restrictions
         add_filter('woocommerce_coupon_is_valid', [$this->coupon_service, 'validate_coupon'], 10, 2);
         add_filter('woocommerce_coupon_error', [$this->coupon_service, 'modify_error_message'], 10, 3);
 
-        // Debug log action
-        add_action('nop_log_event', [$this->logger, 'log_event'], 10, 2);
-    }
+        // Handle mini cart and fragments
+        add_filter('woocommerce_add_to_cart_fragments', [$this->cart_service, 'add_mini_cart_discount_fragment']);
+        add_action('woocommerce_after_mini_cart', [$this->cart_service, 'display_mini_cart_discount']);
+        add_action('woocommerce_review_order_after_cart_contents', [$this->cart_service, 'display_mini_cart_discount']);
 
-    /**
-     * Get admin service instance
-     * 
-     * Allows external access to the admin service for settings
-     * 
-     * @since 1.0.0
-     * @return NOP\Services\NOP_Admin_Service Admin service instance
-     */
-    public function get_admin_service(): NOP\Services\NOP_Admin_Service
-    {
-        return $this->admin_service;
-    }
+        // AJAX handler for mini cart updates
+        add_action('wp_ajax_update_mini_cart_discount', [$this->cart_service, 'update_mini_cart_discount']);
+        add_action('wp_ajax_nopriv_update_mini_cart_discount', [$this->cart_service, 'update_mini_cart_discount']);
 
-    /**
-     * Get rules manager instance
-     * 
-     * Allows external access to the rules manager
-     * 
-     * @since 1.1.0
-     * @return NOP\Services\NOP_Rules_Manager Rules manager instance
-     */
-    public function get_rules_manager(): NOP\Services\NOP_Rules_Manager
-    {
-        return $this->rules_manager;
+        // Handle shipping restrictions
+        add_filter('woocommerce_package_rates', [$this->cart_service, 'remove_free_shipping_when_discount_applied'], 100, 2);
     }
 }
 
-/**
- * Initialize the plugin when WordPress loads
- *
- * Checks for WooCommerce dependency before initializing
- *
- * @since 1.0.0
- */
-add_action('plugins_loaded', function (): void {
-    if (class_exists('WooCommerce')) {
-        NOP_Plugin::get_instance();
-    } else {
-        add_action('admin_notices', function (): void {
-            ?>
-            <div class="error">
-                <p><?php _e('Next Order Plus requires WooCommerce to be installed and activated!', 'next-order-plus'); ?></p>
-            </div>
-            <?php
-        });
+// Initialize the plugin
+function nop_plugin_init()
+{
+    // Make sure WooCommerce is active
+    if (!class_exists('WooCommerce')) {
+        return;
     }
-});
+
+    // Start the plugin
+    $plugin = NOP_Plugin::get_instance();
+}
+
+// Start plugin on woocommerce_init hook to ensure WC is loaded
+add_action('woocommerce_init', 'nop_plugin_init');

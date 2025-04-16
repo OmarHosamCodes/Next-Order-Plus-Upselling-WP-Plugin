@@ -414,13 +414,6 @@ class NOP_Rules_Admin extends NOP_Base
                         <!-- Dynamic fields will be added here -->
                     </div>
 
-                    <div class="nop-form-group">
-                        <label>
-                            <input type="checkbox" id="action_exclusive" name="action_exclusive">
-                            <?php echo esc_html__('Exclusive (prevents other rules from applying)', 'next-order-plus'); ?>
-                        </label>
-                    </div>
-
                     <div class="nop-form-actions">
                         <button type="submit"
                             class="button button-primary"><?php echo esc_html__('Save Rule', 'next-order-plus'); ?></button>

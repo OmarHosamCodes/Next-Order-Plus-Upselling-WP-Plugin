@@ -226,10 +226,6 @@ class NOP_Admin_Service extends NOP_Base
 
         // Keep defaults for all other settings that were removed
         $options = $this->get_options();
-        $sanitized['discount_label'] = $options['discount_label'];
-        $sanitized['min_items'] = $options['min_items'];
-        $sanitized['disable_free_shipping'] = $options['disable_free_shipping'];
-        $sanitized['debug_mode'] = $options['debug_mode'];
 
         // Only sanitize excluded coupons
         if (isset($input['excluded_coupons'])) {
@@ -363,35 +359,6 @@ class NOP_Admin_Service extends NOP_Base
                         </div>
                         <div class="nop-card-content">
                             <div class="nop-fields-grid">
-                                <div class="nop-field nop-field-readonly">
-                                    <label><?php esc_html_e('Discount Label', 'next-order-plus'); ?></label>
-                                    <input type="text" readonly value="<?php echo esc_attr($options['discount_label']); ?>">
-                                    <p class="nop-field-description">
-                                        <?php esc_html_e('Label shown in cart when discount is applied.', 'next-order-plus'); ?>
-                                    </p>
-                                </div>
-
-                                <div class="nop-field nop-field-readonly">
-                                    <label><?php esc_html_e('Minimum Items', 'next-order-plus'); ?></label>
-                                    <input type="number" readonly value="<?php echo esc_attr($options['min_items']); ?>">
-                                    <p class="nop-field-description">
-                                        <?php esc_html_e('Minimum number of items needed for discount.', 'next-order-plus'); ?>
-                                    </p>
-                                </div>
-
-                                <div class="nop-field nop-field-readonly">
-                                    <label><?php esc_html_e('Disable Free Shipping', 'next-order-plus'); ?></label>
-                                    <div class="nop-toggle-readonly">
-                                        <span
-                                            class="nop-toggle-slider <?php echo $options['disable_free_shipping'] ? 'active' : ''; ?>"></span>
-                                        <span
-                                            class="nop-toggle-text"><?php echo $options['disable_free_shipping'] ? esc_html__('Enabled', 'next-order-plus') : esc_html__('Disabled', 'next-order-plus'); ?></span>
-                                    </div>
-                                    <p class="nop-field-description">
-                                        <?php esc_html_e('Disables free shipping when promotion discount is applied.', 'next-order-plus'); ?>
-                                    </p>
-                                </div>
-
                                 <div class="nop-field nop-field-readonly">
                                     <label><?php esc_html_e('Debug Mode', 'next-order-plus'); ?></label>
                                     <div class="nop-toggle-readonly">
@@ -534,10 +501,7 @@ class NOP_Admin_Service extends NOP_Base
     public function get_options(): array
     {
         $defaults = [
-            'discount_label' => __('Discount: 2025 Promotion', 'next-order-plus'),
-            'min_items' => 4,
             'excluded_coupons' => 'gtre50,abon-150',
-            'disable_free_shipping' => true,
             'debug_mode' => false,
         ];
 

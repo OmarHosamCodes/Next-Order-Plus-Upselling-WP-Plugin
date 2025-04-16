@@ -70,28 +70,17 @@ class NOP_Cart_Service extends NOP_Base
         $this->discount_service = $discount_service;
         $this->admin_service = $admin_service;
 
-        // Default values
-        $this->discount_label = __('Discount: 2025 Promotion', 'next-order-plus');
+        // Default values - only keep shipping setting
+        $this->discount_label = __('Discount: Promotion', 'next-order-plus');
         $this->disable_free_shipping = true;
 
-        // If admin service is available, get settings from it
+        // If admin service is available, get shipping setting only
         if ($this->admin_service instanceof NOP_Admin_Service) {
             $options = $this->admin_service->get_options();
 
-            if (isset($options['discount_label']) && !empty($options['discount_label'])) {
-                $this->discount_label = $options['discount_label'];
-            }
-
-            if (isset($options['disable_free_shipping'])) {
-                $this->disable_free_shipping = (bool) $options['disable_free_shipping'];
-            }
+            // We no longer use discount_label from options
+            // We no longer use min items setting
         }
-
-        // Allow filtering discount label
-        $this->discount_label = apply_filters(
-            $this->prefix . 'discount_label',
-            $this->discount_label
-        );
     }
 
     /**
